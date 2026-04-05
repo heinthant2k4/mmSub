@@ -10,7 +10,7 @@ export default defineConfig({
     host_permissions: ['https://api.opensubtitles.com/*'],
     web_accessible_resources: [
       {
-        resources: ['assets/fonts/*'],
+        resources: ['fonts/*'],
         matches: ['<all_urls>'],
       },
     ],
