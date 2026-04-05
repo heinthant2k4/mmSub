@@ -5,7 +5,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        myanmar: ['Padauk', 'Noto Sans Myanmar', 'sans-serif'],
+        myanmar: ['Noto Sans Myanmar', 'sans-serif'],
       },
     },
   },
