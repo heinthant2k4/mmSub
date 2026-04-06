@@ -29,6 +29,9 @@ export default function App() {
   const [dragOver, setDragOver] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState('');
   const [detectedTitle, setDetectedTitle] = useState('');
+  const [fontSize, setFontSize] = useState(24);
+  const [bottomPct, setBottomPct] = useState(8);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleContentTypeChange = useCallback((type: ContentType) => {
@@ -49,6 +52,13 @@ export default function App() {
       if (res?.title) {
         setDetectedTitle(res.title);
         setQuery(res.title);
+      }
+    }).catch(() => {});
+    browser.storage.sync.get('subtitleSettings').then((data: Record<string, unknown>) => {
+      const saved = data['subtitleSettings'] as { fontSize?: number; bottomPct?: number } | undefined;
+      if (saved) {
+        setFontSize(saved.fontSize ?? 24);
+        setBottomPct(saved.bottomPct ?? 8);
       }
     }).catch(() => {});
   }, []);
@@ -151,6 +161,23 @@ export default function App() {
       setStatus(s => ({ ...s, offsetMs: s.offsetMs + deltaMs }));
     } catch {}
   }, []);
+
+  const applyAndSaveSettings = useCallback((nextFontSize: number, nextBottomPct: number) => {
+    browser.storage.sync.set({ subtitleSettings: { fontSize: nextFontSize, bottomPct: nextBottomPct } }).catch(() => {});
+    sendMessage({ type: 'APPLY_SETTINGS', fontSize: nextFontSize, bottomPct: nextBottomPct }).catch(() => {});
+  }, []);
+
+  const handleFontSizeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const next = Number(e.target.value);
+    setFontSize(next);
+    applyAndSaveSettings(next, bottomPct);
+  }, [bottomPct, applyAndSaveSettings]);
+
+  const handleBottomPctChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const next = Number(e.target.value);
+    setBottomPct(next);
+    applyAndSaveSettings(fontSize, next);
+  }, [fontSize, applyAndSaveSettings]);
 
   const handleClear = useCallback(async () => {
     try {
@@ -408,6 +435,51 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Settings panel */}
+      <div className="border-t border-gray-800/60">
+        <button
+          onClick={() => setSettingsOpen(o => !o)}
+          className="w-full flex items-center justify-between px-4 py-2 text-[10px] text-gray-600 hover:text-gray-400 transition-colors"
+        >
+          <span className="uppercase tracking-wider font-medium">⚙ Display Settings</span>
+          <span>{settingsOpen ? '▲' : '▼'}</span>
+        </button>
+        {settingsOpen ? (
+          <div className="px-4 pb-3 space-y-3 bg-gray-900/40">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[10px] text-gray-500 uppercase tracking-wider">Font Size</label>
+                <span className="text-[10px] text-amber-400 font-mono">{fontSize}px</span>
+              </div>
+              <input
+                type="range"
+                min={16}
+                max={40}
+                step={2}
+                value={fontSize}
+                onChange={handleFontSizeChange}
+                className="w-full h-1 accent-amber-500 cursor-pointer"
+              />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[10px] text-gray-500 uppercase tracking-wider">Position</label>
+                <span className="text-[10px] text-amber-400 font-mono">{bottomPct}% from bottom</span>
+              </div>
+              <input
+                type="range"
+                min={5}
+                max={50}
+                step={1}
+                value={bottomPct}
+                onChange={handleBottomPctChange}
+                className="w-full h-1 accent-amber-500 cursor-pointer"
+              />
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       {/* Footer */}
       <div className="px-4 py-2 border-t border-gray-800/40">

@@ -22,6 +22,7 @@ export type PopupMessage =
   | { type: 'OFFSET'; deltaMs: number }
   | { type: 'GET_STATUS' }
   | { type: 'GET_TITLE' }
+  | { type: 'APPLY_SETTINGS'; fontSize: number; bottomPct: number }
   | { type: 'CLEAR' };
 
 // Background → Content messages
@@ -29,6 +30,7 @@ export type ContentMessage =
   | { type: 'LOAD_CUES'; cues: SubtitleCue[] }
   | { type: 'ADJUST_OFFSET'; deltaMs: number }
   | { type: 'GET_TITLE' }
+  | { type: 'SETTINGS'; fontSize: number; bottomPct: number }
   | { type: 'CLEAR' };
 
 // Unified subtitle result from either source

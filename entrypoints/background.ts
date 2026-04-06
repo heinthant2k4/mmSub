@@ -136,6 +136,11 @@ export default defineBackground(() => {
               return { title: '' } satisfies TitleResponse;
             }
           }
+
+          case 'APPLY_SETTINGS': {
+            await sendToContent(tabId, { type: 'SETTINGS', fontSize: message.fontSize, bottomPct: message.bottomPct });
+            return { ok: true };
+          }
         }
       };
 

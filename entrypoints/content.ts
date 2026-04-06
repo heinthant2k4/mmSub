@@ -127,6 +127,10 @@ export default defineContentScript({
           sendResponse({ title } satisfies TitleResponse);
           return true;
         }
+        case 'SETTINGS': {
+          overlay.applySettings(message.fontSize, message.bottomPct);
+          break;
+        }
       }
     });
   },

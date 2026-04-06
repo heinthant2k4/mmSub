@@ -137,6 +137,11 @@ export class SubtitleOverlay {
     this.subtitleEl.textContent = '';
   }
 
+  applySettings(fontSize: number, bottomPct: number): void {
+    this.subtitleEl.style.fontSize = `${fontSize}px`;
+    this.subtitleEl.style.marginBottom = `${bottomPct}%`;
+  }
+
   private reposition(): void {
     if (!this.video) return;
     const videoRect = this.video.getBoundingClientRect();
