@@ -1,8 +1,9 @@
 import { SUBDL_API_KEY, SUBDL_BASE_URL, SUBDL_DOWNLOAD_BASE_URL, SUBDL_LANGUAGE } from './config';
 import type { SubtitleResult } from './messages';
+import type { SearchOpts } from './api-client';
 import { unzip } from 'fflate';
 
-export async function searchSubDL(query: string): Promise<SubtitleResult[]> {
+export async function searchSubDL(query: string, opts?: SearchOpts): Promise<SubtitleResult[]> {
   if (!SUBDL_API_KEY) return [];
 
   const params = new URLSearchParams({
@@ -11,6 +12,16 @@ export async function searchSubDL(query: string): Promise<SubtitleResult[]> {
     languages: SUBDL_LANGUAGE,
     subs_per_page: '30',
   });
+
+  if (opts?.contentType) {
+    params.set('type', opts.contentType === 'tv' ? 'tv' : 'movie');
+  }
+  if (opts?.season != null) {
+    params.set('season_number', String(opts.season));
+  }
+  if (opts?.episode != null) {
+    params.set('episode_number', String(opts.episode));
+  }
 
   const resp = await fetch(`${SUBDL_BASE_URL}/subtitles?${params}`, {
     method: 'GET',

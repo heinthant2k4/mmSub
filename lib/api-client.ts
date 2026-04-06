@@ -13,11 +13,27 @@ function headers(): Record<string, string> {
   };
 }
 
-export async function searchSubtitles(query: string): Promise<SubtitleResult[]> {
+export interface SearchOpts {
+  season?: number;
+  episode?: number;
+  contentType?: 'movie' | 'tv';
+}
+
+export async function searchSubtitles(query: string, opts?: SearchOpts): Promise<SubtitleResult[]> {
   const params = new URLSearchParams({
     query,
     languages: OPENSUBTITLES_LANGUAGE,
   });
+
+  if (opts?.contentType) {
+    params.set('type', opts.contentType === 'tv' ? 'episode' : 'movie');
+  }
+  if (opts?.season != null) {
+    params.set('season_number', String(opts.season));
+  }
+  if (opts?.episode != null) {
+    params.set('episode_number', String(opts.episode));
+  }
 
   const resp = await fetch(`${OPENSUBTITLES_BASE_URL}/subtitles?${params}`, {
     method: 'GET',

@@ -12,10 +12,14 @@ function sendMessage<T>(message: PopupMessage): Promise<T> {
 }
 
 type Tab = 'search' | 'upload';
+type ContentType = 'movie' | 'tv';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('search');
   const [query, setQuery] = useState('');
+  const [contentType, setContentType] = useState<ContentType>('movie');
+  const [season, setSeason] = useState<number | ''>('');
+  const [episode, setEpisode] = useState<number | ''>('');
   const [results, setResults] = useState<SubtitleResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -24,6 +28,14 @@ export default function App() {
   const [dragOver, setDragOver] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleContentTypeChange = useCallback((type: ContentType) => {
+    setContentType(type);
+    if (type === 'movie') {
+      setSeason('');
+      setEpisode('');
+    }
+  }, []);
 
   useEffect(() => {
     sendMessage<StatusResponse>({ type: 'GET_STATUS' }).then(setStatus).catch(() => {});
@@ -35,7 +47,14 @@ export default function App() {
     setError('');
     setResults([]);
     try {
-      const resp = await sendMessage<SearchResponse>({ type: 'SEARCH', query });
+      const msg: PopupMessage = {
+        type: 'SEARCH',
+        query,
+        contentType,
+        ...(contentType === 'tv' && season !== '' ? { season: season as number } : {}),
+        ...(contentType === 'tv' && episode !== '' ? { episode: episode as number } : {}),
+      };
+      const resp = await sendMessage<SearchResponse>(msg);
       if (resp.ok) {
         setResults(resp.results);
         if (resp.results.length === 0) setError('No Burmese subtitles found for this title.');
@@ -47,7 +66,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [query]);
+  }, [query, contentType, season, episode]);
 
   const handleSelect = useCallback(async (result: SubtitleResult) => {
     const key = result.source === 'os' ? `os:${result.fileId}` : `subdl:${result.sdUrl}`;
@@ -183,13 +202,27 @@ export default function App() {
       <div className="p-4">
         {tab === 'search' && (
           <>
+            {/* Movie / TV toggle */}
+            <div className="flex gap-1.5 mb-3 p-1 bg-gray-900 rounded-lg border border-gray-800">
+              <ContentTypeButton
+                label="Movie"
+                active={contentType === 'movie'}
+                onClick={() => handleContentTypeChange('movie')}
+              />
+              <ContentTypeButton
+                label="TV Show"
+                active={contentType === 'tv'}
+                onClick={() => handleContentTypeChange('tv')}
+              />
+            </div>
+
             <div className="flex gap-2 mb-3">
               <input
                 type="text"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                placeholder="Movie or show title..."
+                placeholder={contentType === 'tv' ? 'TV show title...' : 'Movie title...'}
                 className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
                            placeholder-gray-600 focus:outline-none focus:border-amber-500
                            focus:ring-1 focus:ring-amber-500/20 transition-all"
@@ -205,6 +238,42 @@ export default function App() {
                 {loading ? <Spinner /> : 'Search'}
               </button>
             </div>
+
+            {/* Season / Episode inputs (TV only) */}
+            {contentType === 'tv' && (
+              <div className="flex gap-2 mb-3">
+                <div className="flex-1">
+                  <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">
+                    Season
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={season}
+                    onChange={e => setSeason(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value, 10)))}
+                    placeholder="1"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                               placeholder-gray-600 focus:outline-none focus:border-amber-500
+                               focus:ring-1 focus:ring-amber-500/20 transition-all"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">
+                    Episode
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={episode}
+                    onChange={e => setEpisode(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value, 10)))}
+                    placeholder="1"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                               placeholder-gray-600 focus:outline-none focus:border-amber-500
+                               focus:ring-1 focus:ring-amber-500/20 transition-all"
+                  />
+                </div>
+              </div>
+            )}
 
             {error ? <ErrorBanner message={error} onDismiss={() => setError('')} /> : null}
 
@@ -420,6 +489,29 @@ function OffsetBtn({ label, onClick }: { label: string; onClick: () => void }) {
       onClick={onClick}
       className="px-2.5 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 active:bg-gray-600
                  text-[11px] text-gray-400 hover:text-gray-200 transition-colors font-mono"
+    >
+      {label}
+    </button>
+  );
+}
+
+function ContentTypeButton({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
+        active
+          ? 'bg-amber-600 text-white shadow-sm'
+          : 'text-gray-500 hover:text-gray-300'
+      }`}
     >
       {label}
     </button>

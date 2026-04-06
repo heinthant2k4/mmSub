@@ -26,6 +26,48 @@ describe('searchSubtitles', () => {
     expect(options.headers['Content-Type']).toBe('application/json');
   });
 
+  it('does not append season/episode params when opts not provided', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ data: [] }),
+    });
+
+    await searchSubtitles('Breaking Bad');
+
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).not.toContain('season_number');
+    expect(url).not.toContain('episode_number');
+    expect(url).not.toContain('type=');
+  });
+
+  it('appends season_number, episode_number, and type for TV show search', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ data: [] }),
+    });
+
+    await searchSubtitles('Breaking Bad', { season: 3, episode: 7, contentType: 'tv' });
+
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toContain('season_number=3');
+    expect(url).toContain('episode_number=7');
+    expect(url).toContain('type=episode');
+  });
+
+  it('appends type=movie when contentType is movie', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ data: [] }),
+    });
+
+    await searchSubtitles('Inception', { contentType: 'movie' });
+
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toContain('type=movie');
+    expect(url).not.toContain('season_number');
+    expect(url).not.toContain('episode_number');
+  });
+
   it('maps API response to SubtitleResult[]', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,

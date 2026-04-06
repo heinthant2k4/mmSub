@@ -9,7 +9,7 @@ export interface SubtitleCue {
 
 // Popup → Background messages
 export type PopupMessage =
-  | { type: 'SEARCH'; query: string }
+  | { type: 'SEARCH'; query: string; season?: number; episode?: number; contentType?: 'movie' | 'tv' }
   | { type: 'SELECT'; source: 'os'; fileId: number }
   | { type: 'SELECT'; source: 'subdl'; sdUrl: string }
   | { type: 'LOAD_LOCAL'; srtText: string }

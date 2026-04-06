@@ -34,10 +34,15 @@ export default defineBackground(() => {
         switch (message.type) {
           case 'SEARCH': {
             try {
+              const searchOpts = {
+                season: message.season,
+                episode: message.episode,
+                contentType: message.contentType,
+              };
               // Run both APIs in parallel; if one fails, still return the other
               const [osResults, subdlResults] = await Promise.allSettled([
-                searchSubtitles(message.query),
-                searchSubDL(message.query),
+                searchSubtitles(message.query, searchOpts),
+                searchSubDL(message.query, searchOpts),
               ]);
 
               const merged = [
