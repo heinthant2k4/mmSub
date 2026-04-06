@@ -28,7 +28,7 @@ export function handleShortcut(
     return true;
   }
 
-  // Arrow key shortcuts
+  // Arrow key shortcuts — ArrowUp/ArrowDown are intentionally unhandled (reserved for page scroll).
   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
     const direction = event.key === 'ArrowLeft' ? -1 : 1;
     const magnitude = event.shiftKey ? 1000 : 500;
@@ -37,8 +37,9 @@ export function handleShortcut(
     event.preventDefault();
     syncEngine.adjustOffset(deltaMs);
 
-    const offsetSec = (syncEngine.getOffset() / 1000).toFixed(1);
-    const sign = syncEngine.getOffset() >= 0 ? '+' : '';
+    const offsetMs = syncEngine.getOffset();
+    const offsetSec = (offsetMs / 1000).toFixed(1);
+    const sign = offsetMs >= 0 ? '+' : '';
     overlay.showToast(`Offset: ${sign}${offsetSec}s`);
 
     return true;
