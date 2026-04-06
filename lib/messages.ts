@@ -10,10 +10,12 @@ export interface SubtitleCue {
 // Popup → Background messages
 export type PopupMessage =
   | { type: 'SEARCH'; query: string }
-  | { type: 'SELECT'; fileId: number }
+  | { type: 'SELECT'; source: 'os'; fileId: number }
+  | { type: 'SELECT'; source: 'subdl'; sdUrl: string }
   | { type: 'LOAD_LOCAL'; srtText: string }
   | { type: 'OFFSET'; deltaMs: number }
-  | { type: 'GET_STATUS' };
+  | { type: 'GET_STATUS' }
+  | { type: 'CLEAR' };
 
 // Background → Content messages
 export type ContentMessage =
@@ -21,33 +23,30 @@ export type ContentMessage =
   | { type: 'ADJUST_OFFSET'; deltaMs: number }
   | { type: 'CLEAR' };
 
-// Search result from OpenSubtitles
+// Unified subtitle result from either source
 export interface SubtitleResult {
-  fileId: number;
-  title: string;
+  source: 'os' | 'subdl';
+  /** OpenSubtitles file ID (source === 'os') */
+  fileId?: number;
+  /** SubDL download path e.g. /subtitle/123-456.zip (source === 'subdl') */
+  sdUrl?: string;
+  /** Release/file name — used for deduplication */
+  releaseName: string;
+  featureTitle: string;
   language: string;
   downloadCount: number;
   uploadDate: string;
-  featureTitle: string;
   year?: number;
 }
 
 // Background → Popup responses
-export type SearchResponse = {
-  ok: true;
-  results: SubtitleResult[];
-} | {
-  ok: false;
-  error: string;
-};
+export type SearchResponse =
+  | { ok: true; results: SubtitleResult[] }
+  | { ok: false; error: string };
 
-export type SelectResponse = {
-  ok: true;
-  cueCount: number;
-} | {
-  ok: false;
-  error: string;
-};
+export type SelectResponse =
+  | { ok: true; cueCount: number }
+  | { ok: false; error: string };
 
 export type StatusResponse = {
   loaded: boolean;

@@ -1,5 +1,7 @@
 // entrypoints/background.ts
 import { searchSubtitles, downloadSubtitle } from '@/lib/api-client';
+import { searchSubDL, downloadSubDL } from '@/lib/subdl-client';
+import { deduplicateResults } from '@/lib/dedup';
 import { parseSrt } from '@/lib/srt-parser';
 import { SubtitleCache } from '@/lib/cache';
 import type {
@@ -12,15 +14,12 @@ import type {
 
 export default defineBackground(() => {
   const cache = new SubtitleCache();
-
-  // Track loaded cue count and offset per tab
   const tabState = new Map<number, { cueCount: number; offsetMs: number }>();
 
   async function sendToContent(tabId: number, message: ContentMessage): Promise<void> {
     try {
       await browser.tabs.sendMessage(tabId, message);
     } catch {
-      // Content script might not be injected yet (e.g. on extension pages)
       console.warn('[Myanmar Subtitles] Failed to reach content script in tab', tabId);
     }
   }
@@ -35,8 +34,24 @@ export default defineBackground(() => {
         switch (message.type) {
           case 'SEARCH': {
             try {
-              const results = await searchSubtitles(message.query);
-              return { ok: true, results } satisfies SearchResponse;
+              // Run both APIs in parallel; if one fails, still return the other
+              const [osResults, subdlResults] = await Promise.allSettled([
+                searchSubtitles(message.query),
+                searchSubDL(message.query),
+              ]);
+
+              const merged = [
+                ...(osResults.status === 'fulfilled' ? osResults.value : []),
+                ...(subdlResults.status === 'fulfilled' ? subdlResults.value : []),
+              ];
+
+              if (merged.length === 0) {
+                const err =
+                  osResults.status === 'rejected' ? String(osResults.reason) : 'No results found';
+                return { ok: false, error: err } satisfies SearchResponse;
+              }
+
+              return { ok: true, results: deduplicateResults(merged) } satisfies SearchResponse;
             } catch (err) {
               return { ok: false, error: String(err) } satisfies SearchResponse;
             }
@@ -44,17 +59,24 @@ export default defineBackground(() => {
 
           case 'SELECT': {
             try {
-              // Check cache first to avoid re-downloading
-              let srtText = await cache.get(message.fileId);
+              let srtText: string;
 
-              if (!srtText) {
-                srtText = await downloadSubtitle(message.fileId);
-                await cache.set(message.fileId, srtText);
+              if (message.source === 'os') {
+                srtText = (await cache.get(message.fileId)) ?? null as any;
+                if (!srtText) {
+                  srtText = await downloadSubtitle(message.fileId);
+                  await cache.set(message.fileId, srtText);
+                }
+              } else {
+                srtText = (await cache.get(message.sdUrl)) ?? null as any;
+                if (!srtText) {
+                  srtText = await downloadSubDL(message.sdUrl);
+                  await cache.set(message.sdUrl, srtText);
+                }
               }
 
               const cues = parseSrt(srtText);
               tabState.set(tabId, { cueCount: cues.length, offsetMs: 0 });
-
               await sendToContent(tabId, { type: 'LOAD_CUES', cues });
               return { ok: true, cueCount: cues.length } satisfies SelectResponse;
             } catch (err) {
@@ -66,7 +88,6 @@ export default defineBackground(() => {
             try {
               const cues = parseSrt(message.srtText);
               tabState.set(tabId, { cueCount: cues.length, offsetMs: 0 });
-
               await sendToContent(tabId, { type: 'LOAD_CUES', cues });
               return { ok: true, cueCount: cues.length } satisfies SelectResponse;
             } catch (err) {
@@ -76,13 +97,14 @@ export default defineBackground(() => {
 
           case 'OFFSET': {
             const state = tabState.get(tabId);
-            if (state) {
-              state.offsetMs += message.deltaMs;
-            }
-            await sendToContent(tabId, {
-              type: 'ADJUST_OFFSET',
-              deltaMs: message.deltaMs,
-            });
+            if (state) state.offsetMs += message.deltaMs;
+            await sendToContent(tabId, { type: 'ADJUST_OFFSET', deltaMs: message.deltaMs });
+            return { ok: true };
+          }
+
+          case 'CLEAR': {
+            tabState.delete(tabId);
+            await sendToContent(tabId, { type: 'CLEAR' });
             return { ok: true };
           }
 
@@ -97,7 +119,6 @@ export default defineBackground(() => {
         }
       };
 
-      // Must return true to indicate we'll call sendResponse asynchronously
       handle().then(sendResponse).catch((err) => {
         sendResponse({ ok: false, error: String(err) });
       });

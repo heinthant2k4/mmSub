@@ -1,23 +1,25 @@
 const KEY_PREFIX = 'srt_';
 
 export class SubtitleCache {
-  private key(fileId: number): string {
-    return `${KEY_PREFIX}${fileId}`;
+  private key(id: string | number): string {
+    // Encode non-numeric keys to avoid collisions with storage keys
+    const safe = String(id).replace(/[^a-zA-Z0-9_-]/g, encodeURIComponent);
+    return `${KEY_PREFIX}${safe}`;
   }
 
-  async get(fileId: number): Promise<string | null> {
-    const key = this.key(fileId);
-    const result = await chrome.storage.local.get([key]);
-    return result[key] ?? null;
+  async get(id: string | number): Promise<string | null> {
+    const key = this.key(id);
+    const result = await browser.storage.local.get([key]);
+    return (result[key] as string) ?? null;
   }
 
-  async set(fileId: number, srtText: string): Promise<void> {
-    const key = this.key(fileId);
-    await chrome.storage.local.set({ [key]: srtText });
+  async set(id: string | number, srtText: string): Promise<void> {
+    const key = this.key(id);
+    await browser.storage.local.set({ [key]: srtText });
   }
 
-  async remove(fileId: number): Promise<void> {
-    const key = this.key(fileId);
-    await chrome.storage.local.remove([key]);
+  async remove(id: string | number): Promise<void> {
+    const key = this.key(id);
+    await browser.storage.local.remove([key]);
   }
 }

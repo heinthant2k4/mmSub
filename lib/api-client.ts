@@ -1,22 +1,22 @@
 import {
   OPENSUBTITLES_API_KEY,
   OPENSUBTITLES_BASE_URL,
-  BURMESE_LANGUAGE_CODE,
+  OPENSUBTITLES_LANGUAGE,
 } from './config';
 import type { SubtitleResult } from './messages';
 
 function headers(): Record<string, string> {
   return {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
     'Api-Key': OPENSUBTITLES_API_KEY,
-    'User-Agent': 'MyanmarSubtitles v1.0.0',
   };
 }
 
 export async function searchSubtitles(query: string): Promise<SubtitleResult[]> {
   const params = new URLSearchParams({
     query,
-    languages: BURMESE_LANGUAGE_CODE,
+    languages: OPENSUBTITLES_LANGUAGE,
   });
 
   const resp = await fetch(`${OPENSUBTITLES_BASE_URL}/subtitles?${params}`, {
@@ -36,12 +36,13 @@ export async function searchSubtitles(query: string): Promise<SubtitleResult[]> 
     const feature = attr.feature_details ?? {};
 
     return {
+      source: 'os',
       fileId: file?.file_id ?? 0,
-      title: feature.title ?? 'Unknown',
-      language: attr.language ?? BURMESE_LANGUAGE_CODE,
+      releaseName: file?.file_name ?? '',
+      featureTitle: feature.title ?? 'Unknown',
+      language: attr.language ?? OPENSUBTITLES_LANGUAGE,
       downloadCount: attr.download_count ?? 0,
       uploadDate: attr.upload_date ?? '',
-      featureTitle: feature.title ?? 'Unknown',
       year: feature.year,
     } satisfies SubtitleResult;
   });
