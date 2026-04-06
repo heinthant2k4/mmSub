@@ -18,7 +18,7 @@ export type PopupMessage =
   | { type: 'SEARCH'; query: string; season?: number; episode?: number; contentType?: 'movie' | 'tv' }
   | { type: 'SELECT'; source: 'os'; fileId: number }
   | { type: 'SELECT'; source: 'subdl'; sdUrl: string }
-  | { type: 'LOAD_LOCAL'; srtText: string }
+  | { type: 'LOAD_LOCAL'; srtText: string; format?: 'srt' | 'ass' }
   | { type: 'OFFSET'; deltaMs: number }
   | { type: 'GET_STATUS' }
   | { type: 'GET_TITLE' }

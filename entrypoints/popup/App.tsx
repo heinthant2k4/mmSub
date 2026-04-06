@@ -105,16 +105,19 @@ export default function App() {
   }, []);
 
   const processFile = useCallback(async (file: File) => {
-    if (!file.name.toLowerCase().endsWith('.srt')) {
-      setError('Please select a .srt subtitle file.');
+    const lowerName = file.name.toLowerCase();
+    if (!lowerName.endsWith('.srt') && !lowerName.endsWith('.ass') && !lowerName.endsWith('.ssa')) {
+      setError('Please select a .srt, .ass, or .ssa subtitle file.');
       return;
     }
+    const format: 'srt' | 'ass' =
+      lowerName.endsWith('.ass') || lowerName.endsWith('.ssa') ? 'ass' : 'srt';
     setLoading(true);
     setError('');
     setUploadedFileName(file.name);
     try {
       const srtText = await file.text();
-      const resp = await sendMessage<SelectResponse>({ type: 'LOAD_LOCAL', srtText });
+      const resp = await sendMessage<SelectResponse>({ type: 'LOAD_LOCAL', srtText, format });
       if (resp.ok) {
         setStatus(s => ({ ...s, loaded: true, cueCount: resp.cueCount, offsetMs: 0 }));
       } else {
@@ -347,14 +350,14 @@ export default function App() {
                 </>
               ) : (
                 <>
-                  <p className="text-sm text-gray-400 font-medium">Drop .srt file here</p>
+                  <p className="text-sm text-gray-400 font-medium">Drop .srt / .ass / .ssa file here</p>
                   <p className="text-[10px] text-gray-600 mt-1">or click to browse</p>
                 </>
               )}
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".srt"
+                accept=".srt,.ass,.ssa"
                 onChange={handleFileChange}
                 className="hidden"
               />

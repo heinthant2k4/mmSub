@@ -3,6 +3,7 @@ import { searchSubtitles, downloadSubtitle } from '@/lib/api-client';
 import { searchSubDL, downloadSubDL } from '@/lib/subdl-client';
 import { deduplicateResults } from '@/lib/dedup';
 import { parseSrt } from '@/lib/srt-parser';
+import { parseAss } from '@/lib/ass-parser';
 import { SubtitleCache } from '@/lib/cache';
 import type {
   PopupMessage,
@@ -92,7 +93,11 @@ export default defineBackground(() => {
 
           case 'LOAD_LOCAL': {
             try {
-              const cues = parseSrt(message.srtText);
+              const isAss =
+                message.format === 'ass' ||
+                message.srtText.includes('[Events]') ||
+                message.srtText.includes('ScriptType:');
+              const cues = isAss ? parseAss(message.srtText) : parseSrt(message.srtText);
               tabState.set(tabId, { cueCount: cues.length, offsetMs: 0 });
               await sendToContent(tabId, { type: 'LOAD_CUES', cues });
               return { ok: true, cueCount: cues.length } satisfies SelectResponse;
