@@ -98,6 +98,16 @@ export default defineContentScript({
     };
     document.addEventListener('keydown', onKeydown);
 
+    // Apply saved display settings whenever the popup changes them.
+    // Using storage.onChanged bypasses the background service worker entirely,
+    // which is critical in MV3 — the SW may be suspended when sliders are moved.
+    browser.storage.sync.onChanged.addListener((changes: Record<string, browser.storage.StorageChange>) => {
+      if (changes['subtitleSettings']) {
+        const s = changes['subtitleSettings'].newValue as { fontSize?: number; bottomPct?: number } | undefined;
+        if (s) overlay.applySettings(s.fontSize ?? 24, s.bottomPct ?? 8);
+      }
+    });
+
     // Listen for messages from background service worker
     browser.runtime.onMessage.addListener((message: ContentMessage, _sender, sendResponse) => {
       switch (message.type) {
@@ -110,6 +120,11 @@ export default defineContentScript({
           }
           syncEngine.loadCues(message.cues);
           startSyncLoop();
+          // Apply any saved display settings so they survive a subtitle reload
+          browser.storage.sync.get('subtitleSettings').then((data: Record<string, unknown>) => {
+            const s = data['subtitleSettings'] as { fontSize?: number; bottomPct?: number } | undefined;
+            if (s) overlay.applySettings(s.fontSize ?? 24, s.bottomPct ?? 8);
+          }).catch(() => {});
           break;
         }
         case 'ADJUST_OFFSET': {

@@ -34,7 +34,7 @@ describe('detectTitle', () => {
 
     it('returns title from Netflix DOM selector', () => {
       mockQuerySelector.mockImplementation((sel: string) => {
-        if (sel === '.title-card-title-text, .VideoTitle, [data-uia="video-title"]') {
+        if (sel === '[data-uia="video-title"]') {
           return { textContent: '  Squid Game  ' };
         }
         return null;
@@ -63,7 +63,7 @@ describe('detectTitle', () => {
 
     it('returns title from Disney+ DOM selector', () => {
       mockQuerySelector.mockImplementation((sel: string) => {
-        if (sel === '[data-testid="content-title"], .content-title, [class*="DetailTitle"], [class*="PlayerTitle"]') {
+        if (sel === '[data-testid="content-title"]') {
           return { textContent: 'The Mandalorian' };
         }
         return null;
