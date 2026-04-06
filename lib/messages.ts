@@ -47,6 +47,8 @@ export interface SubtitleResult {
   downloadCount: number;
   uploadDate: string;
   year?: number;
+  /** Uploader's username from the subtitle database, if provided */
+  uploaderName?: string;
 }
 
 // Background → Popup responses

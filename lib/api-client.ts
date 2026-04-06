@@ -56,6 +56,7 @@ export async function searchSubtitles(query: string, opts?: SearchOpts): Promise
       downloadCount: attr.download_count ?? 0,
       uploadDate: attr.upload_date ?? '',
       year: feature.year,
+      uploaderName: attr.uploader?.name ?? undefined,
     } satisfies SubtitleResult;
   });
 }

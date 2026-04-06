@@ -48,6 +48,7 @@ export async function searchSubDL(query: string, opts?: SearchOpts): Promise<Sub
     downloadCount: sub.download_count ?? 0,
     uploadDate: sub.release_date ?? '',
     year: movie?.year,
+    uploaderName: sub.author ?? undefined,
   } satisfies SubtitleResult));
 }
 

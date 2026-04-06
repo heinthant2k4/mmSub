@@ -591,11 +591,24 @@ export default function App() {
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-2 border-t border-[#DADCE0] flex items-center justify-center gap-1.5">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="#9AA0A6">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
-        </svg>
-        <p className="text-[10px] text-[#9AA0A6]">OpenSubtitles · SubDL</p>
+      <div className="px-4 py-2 border-t border-[#DADCE0] flex items-center justify-center gap-2">
+        <a
+          href="https://www.opensubtitles.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[10px] text-[#9AA0A6] hover:text-[#1A73E8] transition-colors"
+        >
+          OpenSubtitles
+        </a>
+        <span className="text-[#DADCE0] text-[10px]">·</span>
+        <a
+          href="https://subdl.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[10px] text-[#9AA0A6] hover:text-[#1A73E8] transition-colors"
+        >
+          SubDL
+        </a>
       </div>
     </div>
   );
@@ -708,14 +721,22 @@ function MdResultCard({
           ) : null}
         </div>
       </div>
-      {result.releaseName ? (
-        <div className="flex items-center gap-2 mt-1">
-          <p className="text-[10px] text-[#9AA0A6] truncate">{result.releaseName}</p>
-          {result.downloadCount > 0 ? (
-            <span className="text-[10px] text-[#9AA0A6] shrink-0">↓ {result.downloadCount.toLocaleString()}</span>
-          ) : null}
-        </div>
-      ) : null}
+      <div className="flex items-center gap-2 mt-1">
+        {result.releaseName ? (
+          <p className="text-[10px] text-[#9AA0A6] truncate flex-1">{result.releaseName}</p>
+        ) : <span className="flex-1" />}
+        {result.uploaderName ? (
+          <span className="text-[10px] text-[#5F6368] shrink-0 flex items-center gap-0.5">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            </svg>
+            {result.uploaderName}
+          </span>
+        ) : null}
+        {result.downloadCount > 0 ? (
+          <span className="text-[10px] text-[#9AA0A6] shrink-0">↓ {result.downloadCount.toLocaleString()}</span>
+        ) : null}
+      </div>
     </button>
   );
 }
