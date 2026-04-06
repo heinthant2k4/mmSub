@@ -25,6 +25,26 @@ function stripOverrideTags(text: string): string {
 }
 
 /**
+ * Parse the Format: line from the [Events] section and return
+ * the column indices for Start, End, and Text fields.
+ * Falls back to standard ASS defaults if the line is absent.
+ */
+function parseFormatLine(formatLine: string): { startIdx: number; endIdx: number; textIdx: number } {
+  // Default indices for standard Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
+  const defaults = { startIdx: 1, endIdx: 2, textIdx: 9 };
+
+  const afterPrefix = formatLine.slice('Format:'.length).trim();
+  const cols = afterPrefix.split(',').map(c => c.trim().toLowerCase());
+
+  const startIdx = cols.indexOf('start');
+  const endIdx = cols.indexOf('end');
+  const textIdx = cols.indexOf('text');
+
+  if (startIdx === -1 || endIdx === -1 || textIdx === -1) return defaults;
+  return { startIdx, endIdx, textIdx };
+}
+
+/**
  * Parse ASS/SSA subtitle files and return an array of SubtitleCue objects.
  *
  * Handles:
@@ -34,6 +54,7 @@ function stripOverrideTags(text: string): string {
  * - {override tag} stripping
  * - \N and \n line breaks
  * - CRLF line endings
+ * - Format: line for non-standard column order
  * - Returns cues sorted by startMs with sequential indices
  */
 export function parseAss(text: string): SubtitleCue[] {
@@ -45,6 +66,9 @@ export function parseAss(text: string): SubtitleCue[] {
 
   const cues: SubtitleCue[] = [];
   let inEvents = false;
+  let startIdx = 1;
+  let endIdx = 2;
+  let textIdx = 9;
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -57,21 +81,24 @@ export function parseAss(text: string): SubtitleCue[] {
 
     if (!inEvents) continue;
 
+    // Parse Format: line to get column positions
+    if (trimmed.startsWith('Format:')) {
+      ({ startIdx, endIdx, textIdx } = parseFormatLine(trimmed));
+      continue;
+    }
+
     // Only process Dialogue lines, skip Comment and others
     if (!trimmed.startsWith('Dialogue:')) continue;
 
-    // Split on comma with a max of 10 parts (9 commas = fields 1-9, remainder is Text)
-    // Standard ASS Format order: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
-    // Non-standard column orders (from custom Format: lines) are not supported.
     const afterPrefix = trimmed.slice('Dialogue:'.length).trimStart();
-    // Remove the leading space after "Dialogue: " if present
     const parts = afterPrefix.split(',');
-    if (parts.length < 10) continue;
+    const minCols = Math.max(startIdx, endIdx, textIdx) + 1;
+    if (parts.length < minCols) continue;
 
-    // Rejoin everything from index 9 onward as the Text field
-    const startStr = parts[1].trim();
-    const endStr = parts[2].trim();
-    const textRaw = parts.slice(9).join(',');
+    const startStr = parts[startIdx].trim();
+    const endStr = parts[endIdx].trim();
+    // Rejoin everything from textIdx onward as the Text field (commas allowed in text)
+    const textRaw = parts.slice(textIdx).join(',');
 
     const startMs = assTimeToMs(startStr);
     const endMs = assTimeToMs(endStr);
@@ -80,11 +107,11 @@ export function parseAss(text: string): SubtitleCue[] {
     if (endMs < startMs) continue;
 
     // Process text: strip override tags, then replace soft line breaks
-    const text = stripOverrideTags(textRaw)
+    const cueText = stripOverrideTags(textRaw)
       .replace(/\\N/g, '\n')
       .replace(/\\n/g, '\n');
 
-    cues.push({ index: 0, startMs, endMs, text });
+    cues.push({ index: 0, startMs, endMs, text: cueText });
   }
 
   // Sort by startMs

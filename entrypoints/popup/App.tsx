@@ -93,6 +93,19 @@ export default function App() {
     }
   }, [query, contentType, season, episode]);
 
+  const saveToRecents = useCallback((result: SubtitleResult) => {
+    setRecentSubtitles(prev => {
+      const key = result.source === 'os' ? `os:${result.fileId}` : `subdl:${result.sdUrl}`;
+      const filtered = prev.filter(r => {
+        const rKey = r.source === 'os' ? `os:${r.fileId}` : `subdl:${r.sdUrl}`;
+        return rKey !== key;
+      });
+      const next = [result, ...filtered].slice(0, 5);
+      browser.storage.sync.set({ recentSubtitles: next }).catch(() => {});
+      return next;
+    });
+  }, []);
+
   const handleSelect = useCallback(async (result: SubtitleResult) => {
     const key = result.source === 'os' ? `os:${result.fileId}` : `subdl:${result.sdUrl}`;
     setLoading(true);
@@ -164,19 +177,6 @@ export default function App() {
       await sendMessage({ type: 'OFFSET', deltaMs });
       setStatus(s => ({ ...s, offsetMs: s.offsetMs + deltaMs }));
     } catch {}
-  }, []);
-
-  const saveToRecents = useCallback((result: SubtitleResult) => {
-    setRecentSubtitles(prev => {
-      const key = result.source === 'os' ? `os:${result.fileId}` : `subdl:${result.sdUrl}`;
-      const filtered = prev.filter(r => {
-        const rKey = r.source === 'os' ? `os:${r.fileId}` : `subdl:${r.sdUrl}`;
-        return rKey !== key;
-      });
-      const next = [result, ...filtered].slice(0, 5);
-      browser.storage.sync.set({ recentSubtitles: next }).catch(() => {});
-      return next;
-    });
   }, []);
 
   const applyAndSaveSettings = useCallback((nextFontSize: number, nextBottomPct: number) => {

@@ -37,9 +37,7 @@ export class SubtitleOverlay {
   }
 
   private getStyles(): string {
-    // Use chrome.runtime.getURL for the font file
-    const rt = typeof browser !== 'undefined' ? browser.runtime : (typeof chrome !== 'undefined' ? chrome.runtime : null);
-    const fontUrl = rt?.getURL ? rt.getURL('fonts/NotoSansMyanmar-Regular.ttf') : '';
+    const fontUrl = browser.runtime.getURL('fonts/NotoSansMyanmar-Regular.ttf');
 
     return `
       @font-face {

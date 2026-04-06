@@ -1,6 +1,6 @@
 // entrypoints/background.ts
 import { searchSubtitles, downloadSubtitle } from '@/lib/api-client';
-import { searchSubDL, downloadSubDL } from '@/lib/subdl-client';
+import { searchSubDL, downloadSubDL, type SubDLDownload } from '@/lib/subdl-client';
 import { deduplicateResults } from '@/lib/dedup';
 import { parseSrt } from '@/lib/srt-parser';
 import { parseAss } from '@/lib/ass-parser';
@@ -66,23 +66,28 @@ export default defineBackground(() => {
 
           case 'SELECT': {
             try {
-              let srtText: string;
+              let cues;
 
               if (message.source === 'os') {
-                srtText = (await cache.get(message.fileId)) ?? null as any;
+                let srtText = (await cache.get(message.fileId)) ?? null as any;
                 if (!srtText) {
                   srtText = await downloadSubtitle(message.fileId);
                   await cache.set(message.fileId, srtText);
                 }
+                cues = parseSrt(srtText);
               } else {
-                srtText = (await cache.get(message.sdUrl)) ?? null as any;
-                if (!srtText) {
-                  srtText = await downloadSubDL(message.sdUrl);
-                  await cache.set(message.sdUrl, srtText);
+                const cachedText = await cache.get(message.sdUrl);
+                if (cachedText) {
+                  // Detect format from content: all ASS files begin with [Script Info]
+                  const format = cachedText.trimStart().startsWith('[Script Info]') ? 'ass' : 'srt';
+                  cues = format === 'ass' ? parseAss(cachedText) : parseSrt(cachedText);
+                } else {
+                  const downloaded: SubDLDownload = await downloadSubDL(message.sdUrl);
+                  await cache.set(message.sdUrl, downloaded.text);
+                  cues = downloaded.format === 'ass' ? parseAss(downloaded.text) : parseSrt(downloaded.text);
                 }
               }
 
-              const cues = parseSrt(srtText);
               tabState.set(tabId, { cueCount: cues.length, offsetMs: 0 });
               await sendToContent(tabId, { type: 'LOAD_CUES', cues });
               return { ok: true, cueCount: cues.length } satisfies SelectResponse;
@@ -106,7 +111,8 @@ export default defineBackground(() => {
 
           case 'OFFSET': {
             const state = tabState.get(tabId);
-            if (state) state.offsetMs += message.deltaMs;
+            if (!state) return { ok: false, error: 'No subtitles loaded' };
+            state.offsetMs += message.deltaMs;
             await sendToContent(tabId, { type: 'ADJUST_OFFSET', deltaMs: message.deltaMs });
             return { ok: true };
           }

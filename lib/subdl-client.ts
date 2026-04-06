@@ -51,7 +51,9 @@ export async function searchSubDL(query: string, opts?: SearchOpts): Promise<Sub
   } satisfies SubtitleResult));
 }
 
-export async function downloadSubDL(sdUrl: string): Promise<string> {
+export type SubDLDownload = { text: string; format: 'srt' | 'ass' };
+
+export async function downloadSubDL(sdUrl: string): Promise<SubDLDownload> {
   const resp = await fetch(`${SUBDL_DOWNLOAD_BASE_URL}${sdUrl}`);
 
   if (!resp.ok) {
@@ -59,10 +61,19 @@ export async function downloadSubDL(sdUrl: string): Promise<string> {
   }
 
   const buffer = new Uint8Array(await resp.arrayBuffer());
-  return extractSrtFromZip(buffer);
+  return extractSubtitleFromZip(buffer);
 }
 
-function extractSrtFromZip(data: Uint8Array): Promise<string> {
+function isAss(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.endsWith('.ass') || lower.endsWith('.ssa');
+}
+
+function isSrt(name: string): boolean {
+  return name.toLowerCase().endsWith('.srt');
+}
+
+function extractSubtitleFromZip(data: Uint8Array): Promise<SubDLDownload> {
   return new Promise((resolve, reject) => {
     unzip(data, (err, files) => {
       if (err) {
@@ -70,18 +81,22 @@ function extractSrtFromZip(data: Uint8Array): Promise<string> {
         return;
       }
 
-      // Prefer root-level .srt, then any nested .srt
       const entries = Object.entries(files);
-      const srtEntry =
-        entries.find(([name]) => !name.includes('/') && name.toLowerCase().endsWith('.srt')) ??
-        entries.find(([name]) => name.toLowerCase().endsWith('.srt'));
 
-      if (!srtEntry) {
-        reject(new Error('No .srt file found in ZIP'));
+      // Prefer root-level .srt, then any nested .srt, then root-level .ass/.ssa, then any .ass/.ssa
+      const entry =
+        entries.find(([name]) => !name.includes('/') && isSrt(name)) ??
+        entries.find(([name]) => isSrt(name)) ??
+        entries.find(([name]) => !name.includes('/') && isAss(name)) ??
+        entries.find(([name]) => isAss(name));
+
+      if (!entry) {
+        reject(new Error('No .srt or .ass file found in ZIP'));
         return;
       }
 
-      resolve(new TextDecoder('utf-8').decode(srtEntry[1]));
+      const format = isSrt(entry[0]) ? 'srt' : 'ass';
+      resolve({ text: new TextDecoder('utf-8').decode(entry[1]), format });
     });
   });
 }
