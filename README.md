@@ -1,15 +1,13 @@
 <div align="center">
-
-# myanSub
-
-Myanmar subtitle overlay for streaming video
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![WXT](https://img.shields.io/badge/Built%20with-WXT-orange)](https://wxt.dev)
-[![Manifest V3](https://img.shields.io/badge/Manifest-V3-green)](https://developer.chrome.com/docs/extensions/mv3/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue?logo=typescript)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-196%20passing-brightgreen)](tests/)
-
+  <h1>myanSub</h1>
+  <p>Myanmar subtitle overlay for streaming video</p>
+  <p>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License" /></a>
+    <a href="https://wxt.dev"><img src="https://img.shields.io/badge/Built%20with-WXT-orange" alt="WXT" /></a>
+    <a href="https://developer.chrome.com/docs/extensions/mv3/"><img src="https://img.shields.io/badge/Manifest-V3-green" alt="Manifest V3" /></a>
+    <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-strict-blue?logo=typescript" alt="TypeScript" /></a>
+    <a href="tests/"><img src="https://img.shields.io/badge/tests-196%20passing-brightgreen" alt="Tests" /></a>
+  </p>
 </div>
 
 ---
@@ -18,16 +16,14 @@ Myanmar subtitle overlay for streaming video
 
 **myanSub** is a browser extension that overlays Myanmar subtitles on any streaming video — Netflix, Disney+, Prime Video, Apple TV+, HBO Max and more. It runs entirely in your browser, searches two subtitle databases in parallel, and renders subtitles inside a Shadow DOM so streaming sites can never interfere with them.
 
-```mermaid
-flowchart LR
-    V["Streaming Video<br/>Netflix · Disney+ · Prime · etc."] --> CS
-    subgraph ext ["myanSub Extension"]
-        POP["Popup UI<br/>(React)"] <-->|messages| BG["Background Worker"]
-        BG -->|LOAD_CUES| CS["Content Script"]
-        CS --> OV["Shadow DOM<br/>Subtitle Overlay"]
-    end
-    BG <-->|search| OS["OpenSubtitles API"]
-    BG <-->|search| SD["SubDL API"]
+```
+Streaming Video ──▶  Content Script ──▶  Shadow DOM Overlay
+(Netflix, Disney+…)        ▲
+                           │  LOAD_CUES
+                     Background Worker ◀──▶ OpenSubtitles API
+                           ▲               ◀──▶ SubDL API
+                           │  PopupMessage
+                      Popup UI (React)
 ```
 
 ---
@@ -50,17 +46,24 @@ flowchart LR
 
 ## How It Works
 
-```mermaid
-flowchart TD
-    P["Popup (React)\nSearch · Upload · Settings · Recents"]
-    B["Background Service Worker\nAPI search · ZIP extract · SRT/ASS parse · Cache"]
-    C["Content Script\nVideo detection · rAF sync loop · Shadow DOM overlay"]
-
-    P -->|"PopupMessage\nbrowser.runtime.sendMessage"| B
-    B -->|"ContentMessage\nbrowser.tabs.sendMessage"| C
-    B <-->|fetch| OS["OpenSubtitles API"]
-    B <-->|fetch| SD["SubDL API"]
-    C -.->|"storage.onChanged\n(settings)"| P
+```
+┌─────────────────────────────────────────────────┐
+│  Popup (React)                                  │
+│  Search · Upload · Settings · Recents           │
+└───────────────────┬─────────────────────────────┘
+                    │ PopupMessage
+                    ▼
+┌─────────────────────────────────────────────────┐
+│  Background Service Worker                      │
+│  API search · ZIP extract · SRT/ASS parse       │◀──▶ OpenSubtitles
+└───────────────────┬─────────────────────────────┘◀──▶ SubDL
+                    │ ContentMessage
+                    ▼
+┌─────────────────────────────────────────────────┐
+│  Content Script                                 │
+│  Video detection · rAF sync loop                │
+│  Shadow DOM overlay                             │
+└─────────────────────────────────────────────────┘
 ```
 
 ---
@@ -159,14 +162,18 @@ mmSub/
 
 myanSub searches **two sources in parallel** and merges the results:
 
-```mermaid
-flowchart TD
-    Q["Search Query\ne.g. 'Oppenheimer'"] --> OS["OpenSubtitles API\napi.opensubtitles.com"]
-    Q --> SD["SubDL API\napi.subdl.com"]
-    SD -->|"returns ZIP"| Z["fflate\nextract .srt or .ass"]
-    OS --> M["deduplicateResults\nkey = year + releaseName\nprefer SubDL · sort by downloadCount"]
-    Z --> M
-    M --> R["Result cards in popup"]
+```
+Search query ("Oppenheimer")
+        │
+        ├──▶ OpenSubtitles API  ──────────────────────┐
+        │    api.opensubtitles.com                    │
+        │                                             ▼
+        └──▶ SubDL API  ──▶  fflate (ZIP extract) ──▶ deduplicateResults()
+             api.subdl.com    .srt or .ass             key = year:releaseName
+                                                       prefer SubDL · sort by downloads
+                                                              │
+                                                              ▼
+                                                       Result cards in popup
 ```
 
 ---
