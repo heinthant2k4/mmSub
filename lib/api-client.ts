@@ -3,7 +3,9 @@ import {
   OPENSUBTITLES_BASE_URL,
   OPENSUBTITLES_LANGUAGE,
 } from './config';
-import type { SubtitleResult } from './messages';
+import type { SubtitleResult, SearchOpts } from './messages';
+
+export type { SearchOpts };
 
 function headers(): Record<string, string> {
   return {
@@ -11,12 +13,6 @@ function headers(): Record<string, string> {
     'Accept': 'application/json',
     'Api-Key': OPENSUBTITLES_API_KEY,
   };
-}
-
-export interface SearchOpts {
-  season?: number;
-  episode?: number;
-  contentType?: 'movie' | 'tv';
 }
 
 export async function searchSubtitles(query: string, opts?: SearchOpts): Promise<SubtitleResult[]> {

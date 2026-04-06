@@ -1,5 +1,11 @@
 // lib/messages.ts
 
+export interface SearchOpts {
+  season?: number;
+  episode?: number;
+  contentType?: 'movie' | 'tv';
+}
+
 export interface SubtitleCue {
   index: number;
   startMs: number;

@@ -1,6 +1,5 @@
 import { SUBDL_API_KEY, SUBDL_BASE_URL, SUBDL_DOWNLOAD_BASE_URL, SUBDL_LANGUAGE } from './config';
-import type { SubtitleResult } from './messages';
-import type { SearchOpts } from './api-client';
+import type { SubtitleResult, SearchOpts } from './messages';
 import { unzip } from 'fflate';
 
 export async function searchSubDL(query: string, opts?: SearchOpts): Promise<SubtitleResult[]> {
