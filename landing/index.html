@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>myanSub — Stream your favourite movies in Burmese</title>
+  <meta name="description" content="myanSub is a free, open-source browser extension that overlays Myanmar subtitles on Netflix, Disney+, Prime Video, and more." />
+  <meta property="og:title" content="myanSub — Myanmar subtitle overlay for streaming video" />
+  <meta property="og:description" content="Stream your favourite movies in Burmese. Free, open-source Chrome extension." />
+  <meta property="og:type" content="website" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #07090F;
+      --bg-card:   #0C101C;
+      --bg-card2:  #0F1422;
+      --blue:      #1E6FF5;
+      --blue-dim:  #1558D6;
+      --blue-glow: rgba(30, 111, 245, 0.18);
+      --white:     #F0F4FF;
+      --muted:     #8A94B0;
+      --border:    rgba(255,255,255,0.07);
+      --serif:     'DM Serif Display', Georgia, serif;
+      --sans:      'DM Sans', system-ui, sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--white);
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── Grain overlay ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.5;
+    }
+
+    /* ── Radial glow behind hero ── */
+    .hero-glow {
+      position: absolute;
+      top: -120px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 700px;
+      height: 500px;
+      background: radial-gradient(ellipse at center, rgba(30,111,245,0.22) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 18px 0;
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.3s, background 0.3s, backdrop-filter 0.3s;
+    }
+    nav.scrolled {
+      background: rgba(7,9,15,0.85);
+      backdrop-filter: blur(14px);
+      border-bottom-color: var(--border);
+    }
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+    .nav-logo svg {
+      width: 32px;
+      height: 32px;
+      border-radius: 7px;
+    }
+    .nav-logo-text {
+      font-family: var(--serif);
+      font-size: 20px;
+      color: var(--white);
+      letter-spacing: -0.3px;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: 0.01em;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--white); }
+    .nav-github {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--white) !important;
+      font-size: 13px !important;
+      transition: border-color 0.2s, background 0.2s !important;
+    }
+    .nav-github:hover {
+      border-color: rgba(255,255,255,0.2) !important;
+      background: rgba(255,255,255,0.05);
+    }
+
+    /* ── Scroll reveal ── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.65s ease, transform 0.65s ease;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+    .reveal-delay-4 { transition-delay: 0.4s; }
+
+    /* ── Hero ── */
+    .hero {
+      position: relative;
+      padding: 160px 0 100px;
+      text-align: center;
+      overflow: hidden;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 14px;
+      border: 1px solid rgba(30,111,245,0.35);
+      border-radius: 20px;
+      background: rgba(30,111,245,0.08);
+      font-size: 12px;
+      font-weight: 500;
+      color: #7FB3FF;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+    .hero-badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--blue);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+    .hero h1 {
+      font-family: var(--serif);
+      font-size: clamp(42px, 7vw, 78px);
+      line-height: 1.08;
+      letter-spacing: -1.5px;
+      color: var(--white);
+      margin-bottom: 22px;
+    }
+    .hero h1 em {
+      font-style: italic;
+      color: transparent;
+      -webkit-text-stroke: 1px rgba(255,255,255,0.55);
+    }
+    .hero-sub {
+      font-size: 17px;
+      color: var(--muted);
+      max-width: 460px;
+      margin: 0 auto 40px;
+      line-height: 1.65;
+      font-weight: 300;
+    }
+    .hero-cta {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 13px 26px;
+      background: var(--blue);
+      color: #fff;
+      border-radius: 10px;
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+      box-shadow: 0 0 0 0 rgba(30,111,245,0.4);
+    }
+    .btn-primary:hover {
+      background: #2478ff;
+      transform: translateY(-1px);
+      box-shadow: 0 8px 30px rgba(30,111,245,0.35);
+    }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 13px 22px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 10px;
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 400;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .btn-secondary:hover { border-color: rgba(255,255,255,0.2); color: var(--white); }
+
+    /* ── Streaming sites strip ── */
+    .sites-strip {
+      margin-top: 72px;
+      text-align: center;
+    }
+    .sites-label {
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(138,148,176,0.5);
+      margin-bottom: 18px;
+    }
+    .sites-logos {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 36px;
+      flex-wrap: wrap;
+    }
+    .site-name {
+      font-family: var(--serif);
+      font-size: 15px;
+      color: rgba(138,148,176,0.45);
+      letter-spacing: -0.3px;
+      transition: color 0.2s;
+    }
+    .site-name:hover { color: rgba(138,148,176,0.8); }
+    .sites-sep {
+      width: 1px;
+      height: 14px;
+      background: var(--border);
+    }
+
+    /* ── Section shared ── */
+    section {
+      padding: 96px 0;
+      position: relative;
+      z-index: 1;
+    }
+    .section-label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--blue);
+      margin-bottom: 14px;
+    }
+    .section-title {
+      font-family: var(--serif);
+      font-size: clamp(30px, 4vw, 46px);
+      line-height: 1.15;
+      letter-spacing: -0.8px;
+      color: var(--white);
+      margin-bottom: 14px;
+    }
+    .section-sub {
+      font-size: 16px;
+      color: var(--muted);
+      max-width: 520px;
+      font-weight: 300;
+      line-height: 1.65;
+    }
+
+    /* ── Features ── */
+    .features-header { margin-bottom: 52px; }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    @media (max-width: 768px) {
+      .features-grid { grid-template-columns: 1fr; }
+      .nav-links .hide-mobile { display: none; }
+    }
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 26px;
+      transition: border-color 0.25s, background 0.25s;
+    }
+    .feature-card:hover {
+      border-color: rgba(30,111,245,0.3);
+      background: var(--bg-card2);
+    }
+    .feature-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: rgba(30,111,245,0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+      border: 1px solid rgba(30,111,245,0.18);
+    }
+    .feature-icon svg { width: 20px; height: 20px; }
+    .feature-card h3 {
+      font-family: var(--serif);
+      font-size: 19px;
+      letter-spacing: -0.3px;
+      margin-bottom: 8px;
+      color: var(--white);
+    }
+    .feature-card p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.6;
+      font-weight: 300;
+    }
+
+    /* ── How it works ── */
+    .how-section { background: var(--bg-card); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      margin-top: 52px;
+    }
+    @media (max-width: 768px) { .steps { grid-template-columns: 1fr; } }
+    .step {
+      padding: 0 32px;
+      border-right: 1px solid var(--border);
+      position: relative;
+    }
+    .step:first-child { padding-left: 0; }
+    .step:last-child { border-right: none; padding-right: 0; }
+    @media (max-width: 768px) {
+      .step { border-right: none; border-bottom: 1px solid var(--border); padding: 28px 0; }
+      .step:last-child { border-bottom: none; }
+    }
+    .step-num {
+      font-family: var(--serif);
+      font-size: 56px;
+      line-height: 1;
+      color: rgba(30,111,245,0.18);
+      margin-bottom: 16px;
+      letter-spacing: -2px;
+    }
+    .step h3 {
+      font-family: var(--serif);
+      font-size: 20px;
+      color: var(--white);
+      margin-bottom: 8px;
+      letter-spacing: -0.3px;
+    }
+    .step p {
+      font-size: 14px;
+      color: var(--muted);
+      font-weight: 300;
+      line-height: 1.65;
+    }
+
+    /* ── Keyboard shortcuts ── */
+    .shortcuts-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 40px;
+    }
+    @media (max-width: 600px) { .shortcuts-grid { grid-template-columns: 1fr; } }
+    .shortcut-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+    }
+    .shortcut-desc {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 300;
+    }
+    .kbd-group { display: flex; align-items: center; gap: 4px; }
+    kbd {
+      display: inline-block;
+      padding: 3px 8px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 5px;
+      font-size: 11px;
+      font-family: var(--sans);
+      color: var(--white);
+      letter-spacing: 0;
+    }
+    .kbd-plus {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* ── FAQ ── */
+    .faq-list { margin-top: 48px; display: flex; flex-direction: column; gap: 2px; }
+    .faq-item {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .faq-item + .faq-item { margin-top: 6px; }
+    .faq-q {
+      width: 100%;
+      background: var(--bg-card);
+      border: none;
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      text-align: left;
+      color: var(--white);
+      font-family: var(--sans);
+      font-size: 15px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+    .faq-q:hover { background: var(--bg-card2); }
+    .faq-chevron {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      color: var(--muted);
+      transition: transform 0.3s;
+    }
+    .faq-item.open .faq-chevron { transform: rotate(180deg); }
+    .faq-a {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s ease, padding 0.35s ease;
+      background: var(--bg-card);
+      border-top: 0px solid var(--border);
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.7;
+      font-weight: 300;
+      padding: 0 24px;
+    }
+    .faq-item.open .faq-a {
+      max-height: 300px;
+      padding: 16px 24px 20px;
+      border-top: 1px solid var(--border);
+    }
+    .faq-a a { color: var(--blue); text-decoration: none; }
+    .faq-a a:hover { text-decoration: underline; }
+
+    /* ── Credits ── */
+    .credits-section { padding: 64px 0; }
+    .credits-label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(138,148,176,0.45);
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .credits-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 48px;
+      flex-wrap: wrap;
+    }
+    .credit-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+    }
+    .credit-name {
+      font-family: var(--serif);
+      font-size: 18px;
+      color: rgba(138,148,176,0.5);
+      transition: color 0.2s;
+    }
+    .credit-item:hover .credit-name { color: var(--muted); }
+    .credit-desc {
+      font-size: 11px;
+      color: rgba(138,148,176,0.3);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 36px 0;
+      position: relative;
+      z-index: 1;
+    }
+    .footer-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .footer-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .footer-left svg { width: 24px; height: 24px; border-radius: 5px; }
+    .footer-name {
+      font-family: var(--serif);
+      font-size: 15px;
+      color: var(--muted);
+    }
+    .footer-links {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+    .footer-links a {
+      font-size: 13px;
+      color: rgba(138,148,176,0.5);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .footer-links a:hover { color: var(--muted); }
+    .footer-copy {
+      font-size: 12px;
+      color: rgba(138,148,176,0.3);
+    }
+
+    /* ── Divider ── */
+    hr.fancy {
+      border: none;
+      height: 1px;
+      background: linear-gradient(to right, transparent, var(--border) 30%, var(--border) 70%, transparent);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav id="nav">
+    <div class="container nav-inner">
+      <a href="#" class="nav-logo">
+        <!-- Inline SVG icon -->
+        <svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="nbg" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#1E6FF5"/>
+              <stop offset="100%" stop-color="#0C47C0"/>
+            </linearGradient>
+          </defs>
+          <rect width="128" height="128" rx="22" fill="url(#nbg)"/>
+          <rect x="12" y="10" width="104" height="65" rx="9" fill="rgba(255,255,255,0.12)" stroke="white" stroke-width="5.5"/>
+          <path d="M48,23 L48,59 L85,41 Z" fill="white"/>
+          <rect x="12" y="85" width="104" height="13" rx="6.5" fill="white"/>
+          <rect x="24" y="104" width="80" height="13" rx="6.5" fill="rgba(255,255,255,0.7)"/>
+        </svg>
+        <span class="nav-logo-text">myanSub</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features" class="hide-mobile">Features</a>
+        <a href="#how-it-works" class="hide-mobile">How it works</a>
+        <a href="#faq" class="hide-mobile">FAQ</a>
+        <a href="https://github.com/heinthant2k4/mmSub" target="_blank" rel="noopener" class="nav-github">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-glow"></div>
+    <div class="container">
+      <div class="hero-badge reveal">
+        <span class="hero-badge-dot"></span>
+        Free · Open Source · MIT License
+      </div>
+      <h1 class="reveal reveal-delay-1">
+        Stream your favourite<br/><em>movies in Burmese.</em>
+      </h1>
+      <p class="hero-sub reveal reveal-delay-2">
+        myanSub overlays Myanmar subtitles on Netflix, Disney+, Prime Video, and more — instantly, directly in your browser.
+      </p>
+      <div class="hero-cta reveal reveal-delay-3">
+        <a href="https://github.com/heinthant2k4/mmSub" target="_blank" rel="noopener" class="btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Install from Source
+        </a>
+        <a href="https://github.com/heinthant2k4/mmSub" target="_blank" rel="noopener" class="btn-secondary">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          View on GitHub
+        </a>
+      </div>
+
+      <div class="sites-strip reveal reveal-delay-4">
+        <p class="sites-label">Works on</p>
+        <div class="sites-logos">
+          <span class="site-name">Netflix</span>
+          <span class="sites-sep"></span>
+          <span class="site-name">Disney+</span>
+          <span class="sites-sep"></span>
+          <span class="site-name">Prime Video</span>
+          <span class="sites-sep"></span>
+          <span class="site-name">Apple TV+</span>
+          <span class="sites-sep"></span>
+          <span class="site-name">Max</span>
+          <span class="sites-sep"></span>
+          <span class="site-name">Hulu</span>
+          <span class="sites-sep"></span>
+          <span class="site-name">and more</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="fancy" />
+
+  <!-- Features -->
+  <section id="features">
+    <div class="container">
+      <div class="features-header">
+        <p class="section-label reveal">Features</p>
+        <h2 class="section-title reveal reveal-delay-1">Everything you need.<br/>Nothing you don't.</h2>
+        <p class="section-sub reveal reveal-delay-2">Built with one goal: get Myanmar subtitles on your screen with as little friction as possible.</p>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card reveal">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#1E6FF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+          </div>
+          <h3>Dual-source search</h3>
+          <p>Searches OpenSubtitles and SubDL simultaneously. Results are merged and deduplicated so you always see the best options first.</p>
+        </div>
+        <div class="feature-card reveal reveal-delay-1">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#1E6FF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+            </svg>
+          </div>
+          <h3>Shadow DOM overlay</h3>
+          <p>Subtitles are injected via Shadow DOM — completely isolated from the streaming site's styles. They can never be blocked or broken.</p>
+        </div>
+        <div class="feature-card reveal reveal-delay-2">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#1E6FF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+            </svg>
+          </div>
+          <h3>Local file support</h3>
+          <p>Load any <code style="font-size:12px;color:#7FB3FF;">.srt</code>, <code style="font-size:12px;color:#7FB3FF;">.ass</code>, or <code style="font-size:12px;color:#7FB3FF;">.ssa</code> file directly from your device — no search needed.</p>
+        </div>
+        <div class="feature-card reveal reveal-delay-1">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#1E6FF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <h3>Frame-accurate sync</h3>
+          <p>Subtitles update every animation frame. Keyboard shortcuts let you nudge timing forward or back without leaving the video.</p>
+        </div>
+        <div class="feature-card reveal reveal-delay-2">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#1E6FF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>
+            </svg>
+          </div>
+          <h3>Auto title detection</h3>
+          <p>Opens the popup with the movie or show title already filled in — reads the page title, og:title, and streaming site DOM selectors.</p>
+        </div>
+        <div class="feature-card reveal reveal-delay-3">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#1E6FF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+          </div>
+          <h3>Display controls</h3>
+          <p>Adjust font size (16–40 px) and vertical position (5–50 %). Settings persist across sessions via browser sync storage.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="fancy" />
+
+  <!-- How it works -->
+  <section class="how-section" id="how-it-works">
+    <div class="container">
+      <p class="section-label reveal">How it works</p>
+      <h2 class="section-title reveal reveal-delay-1">Three steps.<br/>Zero friction.</h2>
+      <div class="steps">
+        <div class="step reveal reveal-delay-1">
+          <div class="step-num">01</div>
+          <h3>Search</h3>
+          <p>Click the myanSub icon. The movie title is auto-detected. Hit Search — results from two subtitle databases appear in seconds.</p>
+        </div>
+        <div class="step reveal reveal-delay-2">
+          <div class="step-num">02</div>
+          <h3>Select</h3>
+          <p>Pick a subtitle result from the list. myanSub downloads and parses it in the background — SRT and ASS formats both supported.</p>
+        </div>
+        <div class="step reveal reveal-delay-3">
+          <div class="step-num">03</div>
+          <h3>Watch</h3>
+          <p>Subtitles appear immediately over the video. Use keyboard shortcuts to nudge sync if needed. That's it.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="fancy" />
+
+  <!-- Keyboard shortcuts -->
+  <section id="shortcuts">
+    <div class="container">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:start;">
+        <div>
+          <p class="section-label reveal">Keyboard shortcuts</p>
+          <h2 class="section-title reveal reveal-delay-1">Stay in the<br/>flow.</h2>
+          <p class="section-sub reveal reveal-delay-2">Nudge subtitle timing without touching the popup. Works any time subtitles are loaded.</p>
+        </div>
+        <div class="shortcuts-grid reveal reveal-delay-1">
+          <div class="shortcut-row">
+            <span class="shortcut-desc">Subtitle −0.5 s</span>
+            <div class="kbd-group"><kbd>Alt</kbd><span class="kbd-plus">+</span><kbd>←</kbd></div>
+          </div>
+          <div class="shortcut-row">
+            <span class="shortcut-desc">Subtitle +0.5 s</span>
+            <div class="kbd-group"><kbd>Alt</kbd><span class="kbd-plus">+</span><kbd>→</kbd></div>
+          </div>
+          <div class="shortcut-row">
+            <span class="shortcut-desc">Subtitle −1 s</span>
+            <div class="kbd-group"><kbd>Alt</kbd><span class="kbd-plus">+</span><kbd>Shift</kbd><span class="kbd-plus">+</span><kbd>←</kbd></div>
+          </div>
+          <div class="shortcut-row">
+            <span class="shortcut-desc">Subtitle +1 s</span>
+            <div class="kbd-group"><kbd>Alt</kbd><span class="kbd-plus">+</span><kbd>Shift</kbd><span class="kbd-plus">+</span><kbd>→</kbd></div>
+          </div>
+          <div class="shortcut-row" style="grid-column:1/-1">
+            <span class="shortcut-desc">Clear subtitles</span>
+            <div class="kbd-group"><kbd>Alt</kbd><span class="kbd-plus">+</span><kbd>C</kbd></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="fancy" />
+
+  <!-- FAQ -->
+  <section id="faq">
+    <div class="container">
+      <p class="section-label reveal">FAQ</p>
+      <h2 class="section-title reveal reveal-delay-1">Common questions.</h2>
+      <div class="faq-list reveal reveal-delay-2">
+        <div class="faq-item">
+          <button class="faq-q">
+            Which streaming sites does myanSub work on?
+            <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-a">
+            myanSub works on any website that plays video in a browser — including Netflix, Disney+, Prime Video, Apple TV+, HBO Max, Hulu, Peacock, and more. It also works on unofficial streaming sites via automatic page-title detection.
+          </div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q">
+            Is it free? Will it always be free?
+            <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-a">
+            Yes — myanSub is free, open-source, and will remain free forever. The source code is available on <a href="https://github.com/heinthant2k4/mmSub" target="_blank" rel="noopener">GitHub</a> under the MIT license.
+          </div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q">
+            How do I load a subtitle file I already have?
+            <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-a">
+            Click the myanSub icon, then use the "Upload file" button to load any local <code>.srt</code>, <code>.ass</code>, or <code>.ssa</code> file. Subtitles load instantly without a search.
+          </div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q">
+            Does myanSub collect any of my data?
+            <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-a">
+            No. myanSub has no backend server. The only data sent externally is your movie search query to OpenSubtitles and SubDL. No personal information is collected or transmitted. See the full <a href="https://github.com/heinthant2k4/mmSub/blob/master/docs/PRIVACY.md" target="_blank" rel="noopener">Privacy Policy</a>.
+          </div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q">
+            The subtitles are out of sync. What do I do?
+            <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-a">
+            Use the keyboard shortcuts: <kbd>Alt + ←</kbd> or <kbd>Alt + →</kbd> to nudge timing by 0.5 seconds. Hold <kbd>Shift</kbd> for 1-second steps. You can also try a different subtitle result from the search list — different releases have different timing.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="fancy" />
+
+  <!-- Credits -->
+  <section class="credits-section">
+    <div class="container">
+      <p class="credits-label reveal">Subtitle data provided by</p>
+      <div class="credits-row reveal reveal-delay-1">
+        <a href="https://www.opensubtitles.com" target="_blank" rel="noopener" class="credit-item">
+          <span class="credit-name">OpenSubtitles</span>
+          <span class="credit-desc">Subtitle database</span>
+        </a>
+        <div style="width:1px;height:36px;background:var(--border);"></div>
+        <a href="https://subdl.com" target="_blank" rel="noopener" class="credit-item">
+          <span class="credit-name">SubDL</span>
+          <span class="credit-desc">Subtitle database</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container footer-inner">
+      <div class="footer-left">
+        <svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="fbg" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#1E6FF5"/>
+              <stop offset="100%" stop-color="#0C47C0"/>
+            </linearGradient>
+          </defs>
+          <rect width="128" height="128" rx="22" fill="url(#fbg)"/>
+          <rect x="12" y="10" width="104" height="65" rx="9" fill="rgba(255,255,255,0.12)" stroke="white" stroke-width="5.5"/>
+          <path d="M48,23 L48,59 L85,41 Z" fill="white"/>
+          <rect x="12" y="85" width="104" height="13" rx="6.5" fill="white"/>
+          <rect x="24" y="104" width="80" height="13" rx="6.5" fill="rgba(255,255,255,0.7)"/>
+        </svg>
+        <span class="footer-name">myanSub</span>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/heinthant2k4/mmSub" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/heinthant2k4/mmSub/blob/master/docs/PRIVACY.md" target="_blank" rel="noopener">Privacy</a>
+        <a href="https://github.com/heinthant2k4/mmSub/blob/master/docs/TERMS.md" target="_blank" rel="noopener">Terms</a>
+        <a href="mailto:vibercoder99g@gmail.com">Contact</a>
+      </div>
+      <span class="footer-copy">MIT License · itkoko834 · Myanmar</span>
+    </div>
+  </footer>
+
+  <script>
+    // Nav scroll effect
+    const nav = document.getElementById('nav');
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('scrolled', window.scrollY > 20);
+    }, { passive: true });
+
+    // Scroll reveal
+    const revealEls = document.querySelectorAll('.reveal');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+          observer.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.12 });
+    // Hero elements visible immediately
+    document.querySelectorAll('.hero .reveal').forEach(el => el.classList.add('visible'));
+    // Rest observed
+    revealEls.forEach(el => {
+      if (!el.closest('.hero')) observer.observe(el);
+    });
+
+    // FAQ accordion
+    document.querySelectorAll('.faq-q').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const item = btn.closest('.faq-item');
+        const isOpen = item.classList.contains('open');
+        document.querySelectorAll('.faq-item.open').forEach(i => i.classList.remove('open'));
+        if (!isOpen) item.classList.add('open');
+      });
+    });
+  </script>
+</body>
+</html>
