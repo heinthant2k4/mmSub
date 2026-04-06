@@ -4,8 +4,8 @@ export default defineConfig({
   srcDir: '.',
   modules: ['@wxt-dev/module-react'],
   manifest: {
-    name: 'Myanmar Subtitles',
-    description: 'Overlay Burmese subtitles on any video in your browser',
+    name: 'myanSub',
+    description: 'Overlay Myanmar subtitles on any streaming video',
     version: '1.0.0',
     browser_specific_settings: {
       gecko: {

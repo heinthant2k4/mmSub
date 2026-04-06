@@ -1,6 +1,6 @@
 # Contributing to mmSub
 
-Thank you for helping bring Burmese subtitles to more people. Here's everything you need to get started.
+Thank you for helping bring Myanmar subtitles to more people. Here's everything you need to get started.
 
 ---
 
@@ -102,4 +102,4 @@ Please open a GitHub issue with:
 - Extension version
 - Streaming site URL (no account info needed)
 - What you expected vs. what happened
-- Console errors (F12 → Console, filter by `[Myanmar Subtitles]`)
+- Console errors (F12 → Console, filter by `[myanSub]`)

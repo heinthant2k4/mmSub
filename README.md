@@ -1,38 +1,33 @@
 <div align="center">
 
-```
- ███╗   ███╗███╗   ███╗███████╗██╗   ██╗██████╗
- ████╗ ████║████╗ ████║██╔════╝██║   ██║██╔══██╗
- ██╔████╔██║██╔████╔██║███████╗██║   ██║██████╔╝
- ██║╚██╔╝██║██║╚██╔╝██║╚════██║██║   ██║██╔══██╗
- ██║ ╚═╝ ██║██║ ╚═╝ ██║███████║╚██████╔╝██████╔╝
- ╚═╝     ╚═╝╚═╝     ╚═╝╚══════╝ ╚═════╝ ╚═════╝
-```
+# myanSub
 
-**မြန်မာ ကြားဖြတ်စာတန်း** &nbsp;·&nbsp; Burmese subtitle overlay for streaming video
+Myanmar subtitle overlay for streaming video
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![WXT](https://img.shields.io/badge/Built%20with-WXT-orange)](https://wxt.dev)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-green)](https://developer.chrome.com/docs/extensions/mv3/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue?logo=typescript)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-93%20passing-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/tests-196%20passing-brightgreen)](tests/)
 
 </div>
 
 ---
 
-## What is mmSub?
+## What is myanSub?
 
-**mmSub** is a browser extension that overlays **Burmese (Myanmar) subtitles** on any streaming video — Netflix, Disney+, Prime Video, Apple TV+, HBO Max and more. It runs entirely in your browser, searches two subtitle databases in parallel, and renders subtitles inside a Shadow DOM so streaming sites can never interfere with them.
+**myanSub** is a browser extension that overlays Myanmar subtitles on any streaming video — Netflix, Disney+, Prime Video, Apple TV+, HBO Max and more. It runs entirely in your browser, searches two subtitle databases in parallel, and renders subtitles inside a Shadow DOM so streaming sites can never interfere with them.
 
-```
-  Browser                Extension                     Internet
-  ───────                ─────────                     ────────
-  Netflix ──video──▶  Content Script              ┌── OpenSubtitles API
-  Disney+ ──video──▶  Shadow DOM overlay ◀──────▶ │
-  Prime   ──video──▶  Sync Engine        Background│── SubDL API
-  ...                 Keyboard shortcuts    Worker  │
-                      Font: Noto Sans Myanmar       └── (ZIP extraction)
+```mermaid
+flowchart LR
+    V["Streaming Video<br/>Netflix · Disney+ · Prime · etc."] --> CS
+    subgraph ext ["myanSub Extension"]
+        POP["Popup UI<br/>(React)"] <-->|messages| BG["Background Worker"]
+        BG -->|LOAD_CUES| CS["Content Script"]
+        CS --> OV["Shadow DOM<br/>Subtitle Overlay"]
+    end
+    BG <-->|search| OS["OpenSubtitles API"]
+    BG <-->|search| SD["SubDL API"]
 ```
 
 ---
@@ -42,7 +37,7 @@
 | Feature | Description |
 |---------|-------------|
 | **Dual-source search** | Searches OpenSubtitles and SubDL simultaneously; deduplicates results |
-| **Auto title detection** | Reads the page to pre-fill the search query |
+| **Auto title detection** | Reads the page to pre-fill the search query (works on 9+ platforms + pirate sites via og:title) |
 | **Movie & TV support** | Filter by season and episode number |
 | **Local file support** | Load `.srt`, `.ass`, or `.ssa` files directly from your device |
 | **Real-time sync** | Frame-accurate subtitle timing with keyboard offset controls |
@@ -55,40 +50,17 @@
 
 ## How It Works
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                      Popup (React)                       │
-│                                                          │
-│  ┌──────────┐  ┌──────────┐  ┌────────────────────────┐ │
-│  │  Search  │  │  Upload  │  │  Settings (MD3 sliders) │ │
-│  └────┬─────┘  └────┬─────┘  └────────────────────────┘ │
-└───────┼──────────────┼───────────────────────────────────┘
-        │  PopupMessage│
-        ▼              ▼
-┌──────────────────────────────────────────────────────────┐
-│               Background Service Worker                  │
-│                                                          │
-│  Promise.allSettled([OpenSubtitles, SubDL])              │
-│  deduplicateResults() → cache → parseSrt / parseAss      │
-└──────────────────────────┬───────────────────────────────┘
-                           │  ContentMessage (LOAD_CUES)
-                           ▼
-┌──────────────────────────────────────────────────────────┐
-│                  Content Script                          │
-│                                                          │
-│  MutationObserver → findVideo() → overlay.attachTo()     │
-│                                                          │
-│  requestAnimationFrame loop                              │
-│    syncEngine.getCueAt(currentTime) → overlay.setText()  │
-│                                                          │
-│  ┌────────────────────────────────────────────────────┐  │
-│  │  Shadow DOM  (isolated from page styles)           │  │
-│  │  ┌──────────────────────────────────────────────┐  │  │
-│  │  │  .subtitle-text  (Noto Sans Myanmar)         │  │  │
-│  │  │  .sync-toast     (offset nudge feedback)     │  │  │
-│  │  └──────────────────────────────────────────────┘  │  │
-│  └────────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    P["Popup (React)\nSearch · Upload · Settings · Recents"]
+    B["Background Service Worker\nAPI search · ZIP extract · SRT/ASS parse · Cache"]
+    C["Content Script\nVideo detection · rAF sync loop · Shadow DOM overlay"]
+
+    P -->|"PopupMessage\nbrowser.runtime.sendMessage"| B
+    B -->|"ContentMessage\nbrowser.tabs.sendMessage"| C
+    B <-->|fetch| OS["OpenSubtitles API"]
+    B <-->|fetch| SD["SubDL API"]
+    C -.->|"storage.onChanged\n(settings)"| P
 ```
 
 ---
@@ -130,7 +102,7 @@ pnpm dev --browser firefox
 
 ```
 1. Open a streaming site (Netflix, Disney+, Prime Video…)
-2. Click the mmSub extension icon in the toolbar
+2. Click the myanSub extension icon in the toolbar
 3. Type the movie or TV show title  →  Search
 4. Click a result to load subtitles
 5. Subtitles appear over the video immediately
@@ -167,16 +139,17 @@ mmSub/
 │   ├── srt-parser.ts        # SRT subtitle format parser
 │   ├── sync-engine.ts       # Binary search cue lookup + offset accumulation
 │   ├── overlay.ts           # Shadow DOM overlay — subtitle + toast rendering
-│   ├── title-detector.ts    # Per-site DOM selectors for auto title detection
+│   ├── title-detector.ts    # Universal title detection (streaming + pirate sites)
 │   ├── shortcut-handler.ts  # Keyboard shortcut handler (pure, testable)
 │   ├── dedup.ts             # Result deduplication across subtitle sources
 │   ├── cache.ts             # chrome.storage.local subtitle cache
 │   ├── messages.ts          # Typed message contracts (Popup↔Background↔Content)
 │   └── config.ts            # API keys and base URLs
 ├── public/
+│   ├── icon.svg             # Source icon (generates icon-16/48/128.png)
 │   ├── fonts/               # Noto Sans Myanmar (bundled, no CDN)
 │   └── rules.json           # declarativeNetRequest — User-Agent injection
-├── tests/                   # 93 Vitest unit tests
+├── tests/                   # 196 Vitest unit tests
 └── wxt.config.ts
 ```
 
@@ -184,26 +157,16 @@ mmSub/
 
 ## Subtitle Sources
 
-mmSub searches **two sources in parallel** and merges the results:
+myanSub searches **two sources in parallel** and merges the results:
 
-```
-Query: "Oppenheimer"  contentType: movie
-         │
-         ├──▶  OpenSubtitles API  ──▶  results[]
-         │     api.opensubtitles.com    (source: 'os')
-         │
-         └──▶  SubDL API          ──▶  results[]
-               api.subdl.com           (source: 'subdl')
-                    │
-                    └── returns ZIP → fflate extracts .srt or .ass
-         │
-         ▼
-   deduplicateResults()
-   key = `${year}:${normalise(releaseName)}`
-   prefer SubDL over OS  →  sort by downloadCount desc
-         │
-         ▼
-   ResultCard list in popup
+```mermaid
+flowchart TD
+    Q["Search Query\ne.g. 'Oppenheimer'"] --> OS["OpenSubtitles API\napi.opensubtitles.com"]
+    Q --> SD["SubDL API\napi.subdl.com"]
+    SD -->|"returns ZIP"| Z["fflate\nextract .srt or .ass"]
+    OS --> M["deduplicateResults\nkey = year + releaseName\nprefer SubDL · sort by downloadCount"]
+    Z --> M
+    M --> R["Result cards in popup"]
 ```
 
 ---

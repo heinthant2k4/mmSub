@@ -116,7 +116,7 @@ export default function App() {
       const resp = await sendMessage<SearchResponse>(msg);
       if (resp.ok) {
         setResults(resp.results);
-        if (resp.results.length === 0) setError('No Burmese subtitles found for this title.');
+        if (resp.results.length === 0) setError('No subtitles found for this title.');
       } else {
         setError(resp.error);
       }
@@ -220,9 +220,9 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-[14px] font-semibold leading-tight text-[#202124]">
-              Myanmar Subtitles
+              myanSub
             </h1>
-            <p className="text-[11px] text-[#5F6368] leading-tight">မြန်မာ ကြားဖြတ်စာတန်း</p>
+            <p className="text-[11px] text-[#5F6368] leading-tight">Myanmar subtitle overlay</p>
           </div>
         </div>
 
@@ -404,7 +404,7 @@ export default function App() {
             {results.length > 0 ? (
               <div>
                 <p className="text-[11px] font-medium text-[#5F6368] uppercase tracking-wider mb-2">
-                  {results.length} result{results.length !== 1 ? 's' : ''} · Burmese subtitles
+                  {results.length} result{results.length !== 1 ? 's' : ''} · Myanmar subtitles
                 </p>
                 <div className="space-y-1 max-h-[220px] overflow-y-auto -mr-1 pr-1">
                   {results.map(r => {

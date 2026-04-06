@@ -2,59 +2,19 @@
 
 ## Three-Layer Extension Model
 
-Browser extensions built on Manifest V3 have three isolated JavaScript contexts. mmSub uses all three.
+Browser extensions built on Manifest V3 have three isolated JavaScript contexts. myanSub uses all three.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  LAYER 1 — Popup (React)                                        │
-│  Lifecycle: spawns when user clicks the toolbar icon, dies      │
-│             when popup closes. No persistent state.             │
-│                                                                 │
-│  Responsibilities:                                              │
-│  · Search UI (query, contentType, season, episode)              │
-│  · File upload (drag-and-drop or browse)                        │
-│  · Display settings (font size, vertical position)             │
-│  · Recent subtitles list                                        │
-│  · Sync offset controls                                         │
-│                                                                 │
-│  State persistence: browser.storage.sync                        │
-│  (subtitleSettings, recentSubtitles survive popup close)        │
-└────────────────────────┬────────────────────────────────────────┘
-                         │  PopupMessage  (browser.runtime.sendMessage)
-                         ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  LAYER 2 — Background Service Worker                            │
-│  Lifecycle: event-driven, may be suspended by the browser.      │
-│             Must not keep in-memory state across suspensions.   │
-│             (tabState Map is intentionally lost on suspend —    │
-│              GET_STATUS returns 0 cues, which is safe.)         │
-│                                                                 │
-│  Responsibilities:                                              │
-│  · Dual-source subtitle search (OpenSubtitles + SubDL)          │
-│  · ZIP extraction (fflate)                                      │
-│  · SRT / ASS parsing                                           │
-│  · Subtitle cache (browser.storage.local, 10 MB budget)         │
-│  · Tab state (cueCount, offsetMs per tabId)                     │
-│  · Message relay to content script                              │
-│                                                                 │
-│  Key design: Promise.allSettled ensures one API failure         │
-│  never blocks results from the other source.                    │
-└────────────────────────┬────────────────────────────────────────┘
-                         │  ContentMessage  (browser.tabs.sendMessage)
-                         ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  LAYER 3 — Content Script                                       │
-│  Lifecycle: injected into every page at document_idle.          │
-│             Lives as long as the tab is open.                   │
-│                                                                 │
-│  Responsibilities:                                              │
-│  · Video discovery (largest / playing video heuristic)          │
-│  · MutationObserver for dynamically inserted videos             │
-│  · requestAnimationFrame sync loop                              │
-│  · Keyboard shortcut interception                               │
-│  · Shadow DOM overlay management                                │
-│  · Title detection for popup pre-fill                           │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    POP["Layer 1 — Popup (React)\nLifecycle: spawns on toolbar click, dies on close\nPersistence: browser.storage.sync\n(subtitleSettings, recentSubtitles)"]
+
+    BG["Layer 2 — Background Service Worker\nLifecycle: event-driven, may be suspended\nPersistence: tabState Map (ephemeral — intentionally lost on suspend)\nKey design: Promise.allSettled so one API failure never blocks the other"]
+
+    CS["Layer 3 — Content Script\nLifecycle: injected at document_idle, lives as long as the tab\nPersistence: in-memory (syncEngine, overlay)\nSettings applied via storage.onChanged — bypasses suspended SW"]
+
+    POP -->|"PopupMessage\nbrowser.runtime.sendMessage"| BG
+    BG -->|"ContentMessage\nbrowser.tabs.sendMessage"| CS
+    BG <-->|fetch| APIs["OpenSubtitles API\nSubDL API"]
 ```
 
 ---
@@ -63,45 +23,38 @@ Browser extensions built on Manifest V3 have three isolated JavaScript contexts.
 
 The sync engine converts a flat array of cues into frame-accurate subtitle display.
 
-```
-loadCues(cues[])
-  └── sort by startMs
-  └── reset offsetMs to 0
+```mermaid
+flowchart TD
+    L["loadCues(cues[])"] --> S["sort by startMs"]
+    S --> R["reset offsetMs to 0"]
 
-getCueAt(timeMs)
-  └── effectiveMs = timeMs - offsetMs
-  └── binary search for cue where startMs ≤ effectiveMs < endMs
-  └── returns cue or null
+    G["getCueAt(timeMs)"] --> E["effectiveMs = timeMs − offsetMs"]
+    E --> B["binary search\nstartMs ≤ effectiveMs < endMs"]
+    B --> C{"match?"}
+    C -->|yes| RET["return cue"]
+    C -->|no| NULL["return null"]
 
-adjustOffset(deltaMs)
-  └── offsetMs += deltaMs
-  └── positive = subtitles appear later
-  └── negative = subtitles appear earlier
-
-getOffset() → offsetMs
+    A["adjustOffset(deltaMs)"] --> O["offsetMs += deltaMs\n+ = subtitles appear later\n− = subtitles appear earlier"]
 ```
 
-The binary search is O(log n). For a 2-hour film with one cue per second that's ~7200 cues — the search completes in ~13 iterations. The animation frame loop runs at 60 fps but the search is cheap enough to never cause dropped frames.
+The binary search is O(log n). A 2-hour film with ~7 200 cues completes in ~13 iterations — cheap enough to run inside a 60 fps `requestAnimationFrame` loop without dropping frames.
 
 ---
 
 ## Shadow DOM Overlay
 
-Streaming sites aggressively style the video container and inject their own overlays. Attaching subtitle elements directly to the DOM risks:
+Streaming sites aggressively style the video container and inject their own overlays. Attaching subtitle elements directly to the DOM risks CSS conflicts, JavaScript removal, and z-index wars.
 
-- CSS conflicts (`.subtitle` class collisions)
-- Streaming site JavaScript removing unknown children
-- z-index wars
+myanSub solves this with a Shadow DOM host:
 
-mmSub solves this by attaching a Shadow DOM host:
-
-```
-video.parentElement
-  └── #myanmar-subtitles-host  (position: absolute, z-index: 2147483647)
-        └── #shadow-root (mode: open)
-              ├── <style>  (scoped — no leak in or out)
-              ├── .subtitle-text
-              └── .sync-toast
+```mermaid
+flowchart TD
+    VP["video.parentElement"]
+    VP --> H["#myansub-host\nposition: absolute · z-index: 2147483647"]
+    H --> SR["#shadow-root  mode: open"]
+    SR --> ST["style  (scoped — no leak in or out)"]
+    SR --> SUB[".subtitle-text"]
+    SR --> TOAST[".sync-toast"]
 ```
 
 The host is repositioned by a `ResizeObserver` on the video element and moved inside the fullscreen element on `fullscreenchange`.
@@ -110,21 +63,20 @@ The host is repositioned by a `ResizeObserver` on the video element and moved in
 
 ## Subtitle Deduplication
 
-Both APIs often return the same subtitle file. Deduplication runs after merging results:
+Both APIs often return the same subtitle file. Deduplication runs after merging:
 
-```
-normalize(releaseName)
-  └── toLowerCase
-  └── strip extension (.srt, .ass, .zip)
-  └── replace [._-] with space
-  └── collapse whitespace
-
-key = `${year ?? ''}:${normalize(releaseName)}`
-
-For each key:
-  └── keep SubDL entry over OS entry (SubDL serves direct files, no download quota)
-  └── if same source, keep higher downloadCount
-  └── final sort: downloadCount descending
+```mermaid
+flowchart TD
+    OS["OpenSubtitles results"] --> M["merge arrays"]
+    SD["SubDL results"] --> M
+    M --> N["normalize(releaseName)\nlowerCase · strip ext · replace [._-] → space · collapse whitespace"]
+    N --> K["key = year + ':' + normalizedName"]
+    K --> P{"duplicate key?"}
+    P -->|yes| W["keep SubDL over OS\nor higher downloadCount if same source"]
+    P -->|no| KEEP["keep as-is"]
+    W --> SORT["sort by downloadCount desc"]
+    KEEP --> SORT
+    SORT --> R["Result list"]
 ```
 
 ---
@@ -138,3 +90,21 @@ All communication between layers is typed in `lib/messages.ts`. Adding a new mes
 3. TypeScript will error if any case is unhandled (exhaustive check via `satisfies`)
 
 This prevents the most common extension bug: sending a message that nobody listens for.
+
+```mermaid
+flowchart LR
+    subgraph Popup
+        PM["PopupMessage\nSEARCH · SELECT · LOAD_LOCAL\nOFFSET · GET_STATUS · GET_TITLE\nAPPLY_SETTINGS · CLEAR"]
+    end
+    subgraph Background
+        SR["SearchResponse\nSelectResponse\nStatusResponse\nTitleResponse"]
+        CM["ContentMessage\nLOAD_CUES · ADJUST_OFFSET\nGET_TITLE · SETTINGS · CLEAR"]
+    end
+    subgraph Content
+        direction LR
+        CS["handles ContentMessage\nreturns TitleResponse"]
+    end
+    PM -->|sendMessage| Background
+    Background -->|response| SR
+    CM -->|sendMessage| CS
+```

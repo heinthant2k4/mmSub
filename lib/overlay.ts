@@ -12,7 +12,7 @@ export class SubtitleOverlay {
 
   constructor() {
     this.host = document.createElement('div');
-    this.host.id = 'myanmar-subtitles-host';
+    this.host.id = 'myansub-host';
 
     this.shadow = this.host.attachShadow({ mode: 'open' });
 

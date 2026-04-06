@@ -9,5 +9,5 @@ export const SUBDL_BASE_URL = 'https://api.subdl.com/api/v1';
 export const SUBDL_DOWNLOAD_BASE_URL = 'https://dl.subdl.com';
 export const SUBDL_LANGUAGE = 'MY';
 
-/** Shared Burmese language code used where both APIs agree */
+/** Myanmar language code (ISO 639-1) used across both subtitle APIs */
 export const BURMESE_LANGUAGE_CODE = 'my';

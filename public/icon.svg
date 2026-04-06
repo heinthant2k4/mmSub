@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1E6FF5"/>
+      <stop offset="100%" stop-color="#0C47C0"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square background -->
+  <rect width="128" height="128" rx="22" fill="url(#bg)"/>
+  <!-- Film/video frame -->
+  <rect x="12" y="10" width="104" height="65" rx="9" fill="rgba(255,255,255,0.12)" stroke="white" stroke-width="5.5"/>
+  <!-- Play triangle -->
+  <path d="M48,23 L48,59 L85,41 Z" fill="white"/>
+  <!-- Subtitle line 1 (full width) -->
+  <rect x="12" y="85" width="104" height="13" rx="6.5" fill="white"/>
+  <!-- Subtitle line 2 (shorter, centered — second line of subtitle text) -->
+  <rect x="24" y="104" width="80" height="13" rx="6.5" fill="rgba(255,255,255,0.7)"/>
+</svg>

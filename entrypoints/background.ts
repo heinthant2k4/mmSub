@@ -22,7 +22,7 @@ export default defineBackground(() => {
     try {
       await browser.tabs.sendMessage(tabId, message);
     } catch {
-      console.warn('[Myanmar Subtitles] Failed to reach content script in tab', tabId);
+      console.warn('[myanSub] Failed to reach content script in tab', tabId);
     }
   }
 
