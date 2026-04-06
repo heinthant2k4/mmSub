@@ -10,6 +10,7 @@ import type {
   SearchResponse,
   SelectResponse,
   StatusResponse,
+  TitleResponse,
 } from '@/lib/messages';
 
 export default defineBackground(() => {
@@ -120,6 +121,17 @@ export default defineBackground(() => {
               cueCount: state?.cueCount ?? 0,
               offsetMs: state?.offsetMs ?? 0,
             } satisfies StatusResponse;
+          }
+
+          case 'GET_TITLE': {
+            try {
+              const result = await browser.tabs.sendMessage(tabId, {
+                type: 'GET_TITLE',
+              } satisfies ContentMessage);
+              return result as TitleResponse;
+            } catch {
+              return { title: '' } satisfies TitleResponse;
+            }
           }
         }
       };

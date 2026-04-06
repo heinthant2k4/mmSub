@@ -1,7 +1,8 @@
 // entrypoints/content.ts
 import { SyncEngine } from '@/lib/sync-engine';
 import { SubtitleOverlay } from '@/lib/overlay';
-import type { ContentMessage } from '@/lib/messages';
+import { detectTitle } from '@/lib/title-detector';
+import type { ContentMessage, TitleResponse } from '@/lib/messages';
 
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -77,7 +78,7 @@ export default defineContentScript({
     }
 
     // Listen for messages from background service worker
-    browser.runtime.onMessage.addListener((message: ContentMessage) => {
+    browser.runtime.onMessage.addListener((message: ContentMessage, _sender, sendResponse) => {
       switch (message.type) {
         case 'LOAD_CUES': {
           // Re-detect video in case it changed
@@ -99,6 +100,11 @@ export default defineContentScript({
           syncEngine.loadCues([]);
           overlay.clear();
           break;
+        }
+        case 'GET_TITLE': {
+          const title = detectTitle();
+          sendResponse({ title } satisfies TitleResponse);
+          return true;
         }
       }
     });

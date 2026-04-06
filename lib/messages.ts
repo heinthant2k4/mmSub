@@ -21,12 +21,14 @@ export type PopupMessage =
   | { type: 'LOAD_LOCAL'; srtText: string }
   | { type: 'OFFSET'; deltaMs: number }
   | { type: 'GET_STATUS' }
+  | { type: 'GET_TITLE' }
   | { type: 'CLEAR' };
 
 // Background → Content messages
 export type ContentMessage =
   | { type: 'LOAD_CUES'; cues: SubtitleCue[] }
   | { type: 'ADJUST_OFFSET'; deltaMs: number }
+  | { type: 'GET_TITLE' }
   | { type: 'CLEAR' };
 
 // Unified subtitle result from either source
@@ -58,4 +60,7 @@ export type StatusResponse = {
   loaded: boolean;
   cueCount: number;
   offsetMs: number;
+  detectedTitle?: string;
 };
+
+export type TitleResponse = { title: string };

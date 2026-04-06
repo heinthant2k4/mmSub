@@ -3,6 +3,7 @@ import type {
   SearchResponse,
   SelectResponse,
   StatusResponse,
+  TitleResponse,
   SubtitleResult,
 } from '@/lib/messages';
 import type { PopupMessage } from '@/lib/messages';
@@ -27,6 +28,7 @@ export default function App() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState('');
+  const [detectedTitle, setDetectedTitle] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleContentTypeChange = useCallback((type: ContentType) => {
@@ -39,6 +41,12 @@ export default function App() {
 
   useEffect(() => {
     sendMessage<StatusResponse>({ type: 'GET_STATUS' }).then(setStatus).catch(() => {});
+    sendMessage<TitleResponse>({ type: 'GET_TITLE' }).then((res) => {
+      if (res?.title) {
+        setDetectedTitle(res.title);
+        setQuery(res.title);
+      }
+    }).catch(() => {});
   }, []);
 
   const handleSearch = useCallback(async () => {
@@ -216,7 +224,7 @@ export default function App() {
               />
             </div>
 
-            <div className="flex gap-2 mb-3">
+            <div className="flex gap-2 mb-1">
               <input
                 type="text"
                 value={query}
@@ -238,6 +246,9 @@ export default function App() {
                 {loading ? <Spinner /> : 'Search'}
               </button>
             </div>
+            {detectedTitle && (
+              <DetectedTitleBadge title={detectedTitle} />
+            )}
 
             {/* Season / Episode inputs (TV only) */}
             {contentType === 'tv' && (
@@ -400,6 +411,14 @@ export default function App() {
         </p>
       </div>
     </div>
+  );
+}
+
+function DetectedTitleBadge({ title }: { title: string }) {
+  return (
+    <p className="text-[10px] text-amber-500/80 mb-2 truncate" title={title}>
+      Detected: {title}
+    </p>
   );
 }
 
