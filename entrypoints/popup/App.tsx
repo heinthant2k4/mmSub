@@ -44,10 +44,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Errors are intentionally suppressed: the popup may open before the
-    // background service worker is ready, or on a non-streaming tab where
-    // content scripts are absent. Silently failing leaves the UI in its
-    // empty default state, which is correct behavior.
     sendMessage<StatusResponse>({ type: 'GET_STATUS' }).then(setStatus).catch(() => {});
     sendMessage<TitleResponse>({ type: 'GET_TITLE' }).then((res) => {
       if (res?.title) {
@@ -65,33 +61,6 @@ export default function App() {
       if (Array.isArray(recents)) setRecentSubtitles(recents);
     }).catch(() => {});
   }, []);
-
-  const handleSearch = useCallback(async () => {
-    if (!query.trim()) return;
-    setLoading(true);
-    setError('');
-    setResults([]);
-    try {
-      const msg: PopupMessage = {
-        type: 'SEARCH',
-        query,
-        contentType,
-        ...(contentType === 'tv' && season !== '' ? { season: season as number } : {}),
-        ...(contentType === 'tv' && episode !== '' ? { episode: episode as number } : {}),
-      };
-      const resp = await sendMessage<SearchResponse>(msg);
-      if (resp.ok) {
-        setResults(resp.results);
-        if (resp.results.length === 0) setError('No Burmese subtitles found for this title.');
-      } else {
-        setError(resp.error);
-      }
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [query, contentType, season, episode]);
 
   const saveToRecents = useCallback((result: SubtitleResult) => {
     setRecentSubtitles(prev => {
@@ -130,6 +99,33 @@ export default function App() {
       setLoading(false);
     }
   }, [saveToRecents]);
+
+  const handleSearch = useCallback(async () => {
+    if (!query.trim()) return;
+    setLoading(true);
+    setError('');
+    setResults([]);
+    try {
+      const msg: PopupMessage = {
+        type: 'SEARCH',
+        query,
+        contentType,
+        ...(contentType === 'tv' && season !== '' ? { season: season as number } : {}),
+        ...(contentType === 'tv' && episode !== '' ? { episode: episode as number } : {}),
+      };
+      const resp = await sendMessage<SearchResponse>(msg);
+      if (resp.ok) {
+        setResults(resp.results);
+        if (resp.results.length === 0) setError('No Burmese subtitles found for this title.');
+      } else {
+        setError(resp.error);
+      }
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [query, contentType, season, episode]);
 
   const processFile = useCallback(async (file: File) => {
     const lowerName = file.name.toLowerCase();
@@ -179,6 +175,16 @@ export default function App() {
     } catch {}
   }, []);
 
+  const handleClear = useCallback(async () => {
+    try {
+      await sendMessage({ type: 'CLEAR' });
+      setStatus({ loaded: false, cueCount: 0, offsetMs: 0 });
+      setSelectedKey(null);
+      setUploadedFileName('');
+      setResults([]);
+    } catch {}
+  }, []);
+
   const applyAndSaveSettings = useCallback((nextFontSize: number, nextBottomPct: number) => {
     browser.storage.sync.set({ subtitleSettings: { fontSize: nextFontSize, bottomPct: nextBottomPct } }).catch(() => {});
     sendMessage({ type: 'APPLY_SETTINGS', fontSize: nextFontSize, bottomPct: nextBottomPct }).catch(() => {});
@@ -196,155 +202,192 @@ export default function App() {
     applyAndSaveSettings(fontSize, next);
   }, [fontSize, applyAndSaveSettings]);
 
-  const handleClear = useCallback(async () => {
-    try {
-      await sendMessage({ type: 'CLEAR' });
-      setStatus({ loaded: false, cueCount: 0, offsetMs: 0 });
-      setSelectedKey(null);
-      setUploadedFileName('');
-      setResults([]);
-    } catch {}
-  }, []);
-
   const offsetSeconds = (status.offsetMs / 1000).toFixed(1);
   const offsetSign = status.offsetMs > 0 ? '+' : '';
 
   return (
-    <div className="w-[360px] bg-gray-950 text-gray-100 font-sans flex flex-col select-none">
+    <div className="w-[380px] bg-white text-[#202124] flex flex-col" style={{ fontFamily: "'Google Sans', 'Roboto', sans-serif" }}>
+
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 bg-gradient-to-br from-gray-900 to-gray-950 border-b border-gray-800/80">
-        <div className="flex items-start justify-between">
+      <div className="px-4 pt-4 pb-3 flex items-center justify-between border-b border-[#DADCE0]">
+        <div className="flex items-center gap-3">
+          {/* Icon */}
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+               style={{ background: 'linear-gradient(135deg, #1A73E8 0%, #1557B0 100%)' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+            </svg>
+          </div>
           <div>
-            <h1 className="text-[15px] font-bold text-amber-400 tracking-tight leading-none">
+            <h1 className="text-[14px] font-semibold leading-tight text-[#202124]">
               Myanmar Subtitles
             </h1>
-            <p className="text-[11px] text-gray-500 mt-0.5 tracking-wide">မြန်မာ ကြားဖြတ်စာတန်း</p>
+            <p className="text-[11px] text-[#5F6368] leading-tight">မြန်မာ ကြားဖြတ်စာတန်း</p>
           </div>
-          {status.loaded && (
-            <div className="flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 text-[10px] bg-green-950 text-green-400 border border-green-800/60 px-2 py-1 rounded-full font-medium">
-                <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="currentColor">
-                  <circle cx="5" cy="5" r="5" />
-                </svg>
-                {status.cueCount} cues
-              </span>
-              <button
-                onClick={handleClear}
-                title="Clear subtitles"
-                className="text-gray-600 hover:text-red-400 transition-colors text-xs leading-none p-1"
-              >
-                ✕
-              </button>
-            </div>
-          )}
         </div>
+
+        {status.loaded ? (
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full"
+                  style={{ background: '#E6F4EA', color: '#1E8E3E' }}>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#1E8E3E]" />
+              {status.cueCount} cues
+            </span>
+            <button
+              onClick={handleClear}
+              title="Clear subtitles"
+              className="w-7 h-7 rounded-full flex items-center justify-center text-[#5F6368] hover:bg-[#F1F3F4] hover:text-[#D93025] transition-colors md-ripple"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+              </svg>
+            </button>
+          </div>
+        ) : null}
       </div>
 
-      {/* Tabs */}
-      <div className="flex bg-gray-900 border-b border-gray-800">
+      {/* Tab bar — MD3 style */}
+      <div className="flex border-b border-[#DADCE0] bg-white">
         {(['search', 'upload'] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => { setTab(t); setError(''); }}
-            className={`flex-1 py-2.5 text-xs font-medium transition-all ${
-              tab === t
-                ? 'text-amber-400 border-b-2 border-amber-500'
-                : 'text-gray-500 hover:text-gray-300 border-b-2 border-transparent'
-            }`}
+            className="flex-1 flex items-center justify-center gap-1.5 py-3 text-[13px] font-medium relative transition-colors md-ripple"
+            style={{
+              color: tab === t ? '#1A73E8' : '#5F6368',
+              borderBottom: tab === t ? '2px solid #1A73E8' : '2px solid transparent',
+            }}
           >
-            {t === 'search' ? '🔍  Search Online' : '📁  Local File'}
+            {t === 'search' ? (
+              <>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                </svg>
+                Search Online
+              </>
+            ) : (
+              <>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+                </svg>
+                Local File
+              </>
+            )}
           </button>
         ))}
       </div>
 
-      {/* Tab content */}
-      <div className="p-4">
+      {/* Content */}
+      <div className="p-4 flex flex-col gap-3">
         {tab === 'search' && (
           <>
-            {/* Movie / TV toggle */}
-            <div className="flex gap-1.5 mb-3 p-1 bg-gray-900 rounded-lg border border-gray-800">
-              <ContentTypeButton
+            {/* Movie / TV — MD3 Segmented button */}
+            <div className="flex rounded-full border border-[#DADCE0] overflow-hidden h-9">
+              <SegmentedBtn
                 label="Movie"
+                icon={
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/>
+                  </svg>
+                }
                 active={contentType === 'movie'}
                 onClick={() => handleContentTypeChange('movie')}
               />
-              <ContentTypeButton
+              <SegmentedBtn
                 label="TV Show"
+                icon={
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/>
+                  </svg>
+                }
                 active={contentType === 'tv'}
                 onClick={() => handleContentTypeChange('tv')}
               />
             </div>
 
-            <div className="flex gap-2 mb-1">
-              <input
-                type="text"
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                placeholder={contentType === 'tv' ? 'TV show title...' : 'Movie title...'}
-                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
-                           placeholder-gray-600 focus:outline-none focus:border-amber-500
-                           focus:ring-1 focus:ring-amber-500/20 transition-all"
-              />
+            {/* Search field — MD3 outlined text field */}
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                  placeholder={contentType === 'tv' ? 'TV show title…' : 'Movie title…'}
+                  className="w-full h-10 px-3 text-[13px] text-[#202124] placeholder-[#9AA0A6] outline-none transition-all peer"
+                  style={{
+                    background: 'transparent',
+                    border: '1.5px solid #DADCE0',
+                    borderRadius: '8px',
+                  }}
+                  onFocus={e => (e.target.style.borderColor = '#1A73E8')}
+                  onBlur={e => (e.target.style.borderColor = '#DADCE0')}
+                />
+              </div>
               <button
                 onClick={handleSearch}
                 disabled={loading || !query.trim()}
-                className="bg-amber-600 hover:bg-amber-500 active:bg-amber-700
-                           disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed
-                           text-white px-4 py-2 rounded-lg text-sm font-medium transition-all
-                           min-w-[72px] flex items-center justify-center gap-1.5"
+                className="h-10 px-4 rounded-lg text-[13px] font-medium transition-all flex items-center gap-1.5 shrink-0 md-ripple"
+                style={{
+                  background: loading || !query.trim() ? '#F1F3F4' : '#1A73E8',
+                  color: loading || !query.trim() ? '#9AA0A6' : '#FFFFFF',
+                  cursor: loading || !query.trim() ? 'not-allowed' : 'pointer',
+                }}
               >
-                {loading ? <Spinner /> : 'Search'}
+                {loading ? <MdSpinner /> : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                  </svg>
+                )}
+                Search
               </button>
             </div>
-            {detectedTitle ? <DetectedTitleBadge title={detectedTitle} /> : null}
 
-            {/* Season / Episode inputs (TV only) */}
-            {contentType === 'tv' && (
-              <div className="flex gap-2 mb-3">
-                <div className="flex-1">
-                  <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">
-                    Season
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={season}
-                    onChange={e => setSeason(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value, 10)))}
-                    placeholder="1"
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
-                               placeholder-gray-600 focus:outline-none focus:border-amber-500
-                               focus:ring-1 focus:ring-amber-500/20 transition-all"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">
-                    Episode
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={episode}
-                    onChange={e => setEpisode(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value, 10)))}
-                    placeholder="1"
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
-                               placeholder-gray-600 focus:outline-none focus:border-amber-500
-                               focus:ring-1 focus:ring-amber-500/20 transition-all"
-                  />
-                </div>
+            {/* Detected title chip */}
+            {detectedTitle ? (
+              <div className="flex items-center gap-1.5">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="#1A73E8">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+                <span className="text-[11px] text-[#1A73E8] truncate" title={detectedTitle}>
+                  Detected: {detectedTitle}
+                </span>
               </div>
-            )}
+            ) : null}
 
-            {error ? <ErrorBanner message={error} onDismiss={() => setError('')} /> : null}
+            {/* Season/Episode — TV only */}
+            {contentType === 'tv' ? (
+              <div className="flex gap-2">
+                <MdInput
+                  label="Season"
+                  type="number"
+                  min={1}
+                  value={season}
+                  onChange={e => setSeason(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value, 10)))}
+                  placeholder="1"
+                />
+                <MdInput
+                  label="Episode"
+                  type="number"
+                  min={1}
+                  value={episode}
+                  onChange={e => setEpisode(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value, 10)))}
+                  placeholder="1"
+                />
+              </div>
+            ) : null}
 
-            {recentSubtitles.length > 0 && results.length === 0 && (
-              <div className="mb-3">
-                <p className="text-[10px] text-gray-600 uppercase tracking-wider mb-2">Recent</p>
-                <div className="space-y-1.5">
+            {error ? <MdError message={error} onDismiss={() => setError('')} /> : null}
+
+            {/* Recent subtitles */}
+            {recentSubtitles.length > 0 && results.length === 0 ? (
+              <div>
+                <p className="text-[11px] font-medium text-[#5F6368] uppercase tracking-wider mb-2">Recent</p>
+                <div className="space-y-1">
                   {recentSubtitles.map(r => {
                     const key = r.source === 'os' ? `os:${r.fileId}` : `subdl:${r.sdUrl}`;
                     return (
-                      <ResultCard
+                      <MdResultCard
                         key={key}
                         result={r}
                         selected={selectedKey === key}
@@ -355,18 +398,19 @@ export default function App() {
                   })}
                 </div>
               </div>
-            )}
+            ) : null}
 
-            {results.length > 0 && (
+            {/* Results */}
+            {results.length > 0 ? (
               <div>
-                <p className="text-[10px] text-gray-600 uppercase tracking-wider mb-2">
+                <p className="text-[11px] font-medium text-[#5F6368] uppercase tracking-wider mb-2">
                   {results.length} result{results.length !== 1 ? 's' : ''} · Burmese subtitles
                 </p>
-                <div className="space-y-1.5 max-h-[200px] overflow-y-auto -mr-1 pr-1">
+                <div className="space-y-1 max-h-[220px] overflow-y-auto -mr-1 pr-1">
                   {results.map(r => {
                     const key = r.source === 'os' ? `os:${r.fileId}` : `subdl:${r.sdUrl}`;
                     return (
-                      <ResultCard
+                      <MdResultCard
                         key={key}
                         result={r}
                         selected={selectedKey === key}
@@ -377,13 +421,20 @@ export default function App() {
                   })}
                 </div>
               </div>
-            )}
+            ) : null}
 
-            {!loading && results.length === 0 && !error && (
-              <p className="text-[11px] text-gray-600 text-center py-6">
-                Search for a movie or TV show to find<br />Burmese subtitles on OpenSubtitles
-              </p>
-            )}
+            {!loading && results.length === 0 && !error && recentSubtitles.length === 0 ? (
+              <div className="flex flex-col items-center py-6 text-center">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3"
+                     style={{ background: '#E8F0FE' }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="#1A73E8">
+                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                  </svg>
+                </div>
+                <p className="text-[13px] text-[#5F6368] font-medium">Search for subtitles</p>
+                <p className="text-[11px] text-[#9AA0A6] mt-0.5">OpenSubtitles · SubDL</p>
+              </div>
+            ) : null}
           </>
         )}
 
@@ -394,30 +445,39 @@ export default function App() {
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
-                dragOver
-                  ? 'border-amber-500 bg-amber-950/20 scale-[1.01]'
-                  : uploadedFileName
-                    ? 'border-green-700/60 bg-green-950/10 hover:border-green-600'
-                    : 'border-gray-700 hover:border-gray-500 bg-gray-900/40'
-              }`}
+              className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all"
+              style={{
+                borderColor: dragOver ? '#1A73E8' : uploadedFileName ? '#1E8E3E' : '#DADCE0',
+                background: dragOver ? '#E8F0FE' : uploadedFileName ? '#E6F4EA' : '#F8F9FA',
+              }}
             >
-              <div className="text-3xl mb-2">
-                {loading ? '⏳' : uploadedFileName ? '✅' : '📄'}
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center"
+                     style={{ background: uploadedFileName ? '#1E8E3E' : '#1A73E8', opacity: loading ? 0.6 : 1 }}>
+                  {loading ? (
+                    <MdSpinner white />
+                  ) : uploadedFileName ? (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                      <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8zm0-4h5v2H8z"/>
+                    </svg>
+                  )}
+                </div>
+                {uploadedFileName ? (
+                  <>
+                    <p className="text-[13px] font-medium text-[#1E8E3E] truncate max-w-[200px]">{uploadedFileName}</p>
+                    <p className="text-[11px] text-[#5F6368]">Click or drop to replace</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[13px] font-medium text-[#3C4043]">Drop subtitle file here</p>
+                    <p className="text-[11px] text-[#5F6368]">.srt · .ass · .ssa &nbsp;·&nbsp; or click to browse</p>
+                  </>
+                )}
               </div>
-              {uploadedFileName ? (
-                <>
-                  <p className="text-sm text-green-400 font-medium truncate max-w-[200px] mx-auto">
-                    {uploadedFileName}
-                  </p>
-                  <p className="text-[10px] text-gray-600 mt-1">Click or drop to replace</p>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm text-gray-400 font-medium">Drop .srt / .ass / .ssa file here</p>
-                  <p className="text-[10px] text-gray-600 mt-1">or click to browse</p>
-                </>
-              )}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -426,142 +486,184 @@ export default function App() {
                 className="hidden"
               />
             </div>
-
-            {loading && (
-              <div className="flex items-center justify-center gap-2 mt-3 text-xs text-gray-500">
-                <Spinner /> Parsing subtitles...
-              </div>
-            )}
-
-            {error ? <div className="mt-3"><ErrorBanner message={error} onDismiss={() => setError('')} /></div> : null}
+            {error ? <MdError message={error} onDismiss={() => setError('')} /> : null}
           </>
         )}
       </div>
 
-      {/* Sync controls */}
-      {status.loaded && (
-        <div className="border-t border-gray-800 bg-gray-900/70 px-4 py-3">
+      {/* Sync controls — shown when subtitles loaded */}
+      {status.loaded ? (
+        <div className="border-t border-[#DADCE0] px-4 py-3 bg-[#F8F9FA]">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] text-gray-600 uppercase tracking-wider font-medium">
-              Sync Offset
-            </span>
-            <span className={`text-xs font-mono font-semibold tabular-nums ${
-              status.offsetMs === 0
-                ? 'text-gray-500'
-                : status.offsetMs > 0
-                  ? 'text-blue-400'
-                  : 'text-orange-400'
-            }`}>
+            <span className="text-[11px] font-medium text-[#5F6368] uppercase tracking-wider">Sync Offset</span>
+            <span className="text-[12px] font-medium tabular-nums font-mono"
+                  style={{ color: status.offsetMs === 0 ? '#9AA0A6' : status.offsetMs > 0 ? '#1A73E8' : '#E37400' }}>
               {offsetSign}{offsetSeconds}s
             </span>
           </div>
-          <div className="flex items-center gap-1">
-            <OffsetBtn label="−1s" onClick={() => handleOffset(-1000)} />
-            <OffsetBtn label="−½s" onClick={() => handleOffset(-500)} />
+          <div className="flex gap-1">
+            <SyncBtn label="−1s" onClick={() => handleOffset(-1000)} />
+            <SyncBtn label="−0.5s" onClick={() => handleOffset(-500)} />
             <button
               onClick={() => handleOffset(-status.offsetMs)}
               disabled={status.offsetMs === 0}
-              className="flex-1 text-[10px] text-gray-500 hover:text-gray-300 disabled:text-gray-700
-                         py-1.5 rounded-lg bg-gray-800 hover:bg-gray-750 disabled:bg-gray-800/50
-                         transition-colors disabled:cursor-not-allowed"
+              className="flex-1 text-[11px] font-medium py-1.5 rounded-lg transition-colors md-ripple disabled:opacity-40"
+              style={{ background: '#E8EAED', color: '#3C4043' }}
             >
               Reset
             </button>
-            <OffsetBtn label="+½s" onClick={() => handleOffset(500)} />
-            <OffsetBtn label="+1s" onClick={() => handleOffset(1000)} />
+            <SyncBtn label="+0.5s" onClick={() => handleOffset(500)} />
+            <SyncBtn label="+1s" onClick={() => handleOffset(1000)} />
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Settings panel */}
-      <div className="border-t border-gray-800/60">
+      {/* Settings — MD3 expansion panel */}
+      <div className="border-t border-[#DADCE0]">
         <button
           onClick={() => setSettingsOpen(o => !o)}
-          className="w-full flex items-center justify-between px-4 py-2 text-[10px] text-gray-600 hover:text-gray-400 transition-colors"
+          className="w-full flex items-center justify-between px-4 py-2.5 text-[12px] font-medium text-[#5F6368] hover:bg-[#F1F3F4] transition-colors md-ripple"
         >
-          <span className="uppercase tracking-wider font-medium">⚙ Display Settings</span>
-          <span>{settingsOpen ? '▲' : '▼'}</span>
+          <span className="flex items-center gap-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+            </svg>
+            Display settings
+          </span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"
+               style={{ transform: settingsOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 200ms' }}>
+            <path d="M7 10l5 5 5-5z"/>
+          </svg>
         </button>
+
         {settingsOpen ? (
-          <div className="px-4 pb-3 space-y-3 bg-gray-900/40">
+          <div className="px-4 pb-4 pt-1 flex flex-col gap-4 bg-[#F8F9FA]">
+            {/* Font size */}
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-[10px] text-gray-500 uppercase tracking-wider">Font Size</label>
-                <span className="text-[10px] text-amber-400 font-mono">{fontSize}px</span>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[12px] text-[#3C4043]">Font size</span>
+                <span className="text-[12px] font-medium text-[#1A73E8]">{fontSize}px</span>
               </div>
               <input
-                type="range"
-                min={16}
-                max={40}
-                step={2}
-                value={fontSize}
+                type="range" min={16} max={40} step={2} value={fontSize}
                 onChange={handleFontSizeChange}
-                className="w-full h-1 accent-amber-500 cursor-pointer"
+                className="w-full"
+                style={{ '--progress': `${((fontSize - 16) / 24) * 100}%` } as React.CSSProperties}
               />
+              <div className="flex justify-between mt-1">
+                <span className="text-[10px] text-[#9AA0A6]">16px</span>
+                <span className="text-[10px] text-[#9AA0A6]">40px</span>
+              </div>
             </div>
+
+            {/* Vertical position */}
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-[10px] text-gray-500 uppercase tracking-wider">Position</label>
-                <span className="text-[10px] text-amber-400 font-mono">{bottomPct}% from bottom</span>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[12px] text-[#3C4043]">Vertical position</span>
+                <span className="text-[12px] font-medium text-[#1A73E8]">{bottomPct}% from bottom</span>
               </div>
               <input
-                type="range"
-                min={5}
-                max={50}
-                step={1}
-                value={bottomPct}
+                type="range" min={5} max={50} step={1} value={bottomPct}
                 onChange={handleBottomPctChange}
-                className="w-full h-1 accent-amber-500 cursor-pointer"
+                className="w-full"
+                style={{ '--progress': `${((bottomPct - 5) / 45) * 100}%` } as React.CSSProperties}
               />
+              <div className="flex justify-between mt-1">
+                <span className="text-[10px] text-[#9AA0A6]">Bottom</span>
+                <span className="text-[10px] text-[#9AA0A6]">Center</span>
+              </div>
+            </div>
+
+            {/* Keyboard shortcuts hint */}
+            <div className="rounded-lg p-3 flex gap-2.5" style={{ background: '#E8F0FE' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="#1A73E8" className="shrink-0 mt-0.5">
+                <path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
+              </svg>
+              <div className="text-[10px] text-[#1557B0] leading-relaxed">
+                <p className="font-medium mb-0.5">Keyboard shortcuts</p>
+                <p>Alt+← / Alt+→ · ±0.5s offset</p>
+                <p>Alt+Shift+← / → · ±1s offset</p>
+                <p>Alt+C · Clear subtitles</p>
+              </div>
             </div>
           </div>
         ) : null}
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-2 border-t border-gray-800/40">
-        <p className="text-[9px] text-gray-700 text-center tracking-wide">
-          Powered by OpenSubtitles
-        </p>
+      <div className="px-4 py-2 border-t border-[#DADCE0] flex items-center justify-center gap-1.5">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="#9AA0A6">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+        </svg>
+        <p className="text-[10px] text-[#9AA0A6]">OpenSubtitles · SubDL</p>
       </div>
     </div>
   );
 }
 
-function DetectedTitleBadge({ title }: { title: string }) {
+/* ── Sub-components ─────────────────────────────────────── */
+
+function SegmentedBtn({
+  label,
+  icon,
+  active,
+  onClick,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  active: boolean;
+  onClick: () => void;
+}) {
   return (
-    <p className="text-[10px] text-amber-500/80 mb-2 truncate" title={title}>
-      Detected: {title}
-    </p>
+    <button
+      onClick={onClick}
+      className="flex-1 flex items-center justify-center gap-1.5 text-[12px] font-medium transition-all md-ripple"
+      style={{
+        background: active ? '#E8F0FE' : 'transparent',
+        color: active ? '#1A73E8' : '#5F6368',
+      }}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
 
-function Spinner() {
+function MdInput({
+  label,
+  ...props
+}: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
-    <svg className="animate-spin h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none">
-      <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-80" fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-    </svg>
+    <div className="flex-1 flex flex-col gap-1">
+      <label className="text-[10px] font-medium text-[#5F6368] uppercase tracking-wider">{label}</label>
+      <input
+        {...props}
+        className="h-9 px-3 text-[13px] text-[#202124] placeholder-[#9AA0A6] outline-none rounded-lg transition-all"
+        style={{ border: '1.5px solid #DADCE0' }}
+        onFocus={e => (e.target.style.borderColor = '#1A73E8')}
+        onBlur={e => (e.target.style.borderColor = '#DADCE0')}
+      />
+    </div>
   );
 }
 
-function ErrorBanner({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+function MdError({ message, onDismiss }: { message: string; onDismiss: () => void }) {
   return (
-    <div className="flex items-start gap-2 bg-red-950/40 border border-red-800/50 rounded-lg p-2.5 mb-3">
-      <span className="text-red-500 text-xs mt-px shrink-0">⚠</span>
-      <p className="text-[11px] text-red-300 flex-1 leading-relaxed">{message}</p>
-      <button
-        onClick={onDismiss}
-        className="text-red-700 hover:text-red-500 text-xs shrink-0 transition-colors"
-      >
-        ✕
+    <div className="flex items-start gap-2.5 rounded-lg p-3" style={{ background: '#FCE8E6' }}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="#D93025" className="shrink-0 mt-px">
+        <path d="M11 15h2v2h-2zm0-8h2v6h-2zm.99-5C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/>
+      </svg>
+      <p className="text-[12px] text-[#D93025] flex-1 leading-relaxed">{message}</p>
+      <button onClick={onDismiss} className="text-[#D93025] hover:opacity-70 transition-opacity shrink-0">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+        </svg>
       </button>
     </div>
   );
 }
 
-function ResultCard({
+function MdResultCard({
   result,
   selected,
   loading,
@@ -573,80 +675,72 @@ function ResultCard({
   onSelect: () => void;
 }) {
   const sourceBadge = result.source === 'subdl'
-    ? { label: 'SubDL', cls: 'bg-blue-950 text-blue-400 border-blue-800/50' }
-    : { label: 'OS', cls: 'bg-orange-950 text-orange-400 border-orange-800/50' };
+    ? { label: 'SubDL', bg: '#E8F0FE', color: '#1A73E8' }
+    : { label: 'OS', bg: '#FEF7E0', color: '#B06000' };
 
   return (
     <button
       onClick={onSelect}
       disabled={loading}
-      className={`w-full text-left px-3 py-2.5 rounded-lg border transition-all text-sm ${
-        selected
-          ? 'bg-amber-950/30 border-amber-600/50 shadow-inner'
-          : 'bg-gray-800/50 border-gray-700/50 hover:bg-gray-800 hover:border-gray-600'
-      } disabled:opacity-50 disabled:cursor-not-allowed`}
+      className="w-full text-left px-3 py-2.5 rounded-lg border transition-all md-ripple disabled:opacity-50 disabled:cursor-not-allowed"
+      style={{
+        background: selected ? '#E8F0FE' : '#FFFFFF',
+        borderColor: selected ? '#1A73E8' : '#DADCE0',
+        boxShadow: selected ? 'none' : '0 1px 2px rgba(0,0,0,0.06)',
+      }}
     >
       <div className="flex items-start gap-2">
-        <span className="flex-1 font-medium text-gray-100 leading-snug text-[13px]">
+        <span className="flex-1 text-[13px] font-medium text-[#202124] leading-snug">
           {result.featureTitle}
         </span>
-        <div className="flex items-center gap-1.5 shrink-0 mt-px">
+        <div className="flex items-center gap-1 shrink-0 mt-px">
           {result.year ? (
-            <span className="text-[10px] bg-gray-700/80 text-gray-400 px-1.5 py-0.5 rounded font-mono">
-              {result.year}
-            </span>
+            <span className="text-[10px] text-[#5F6368] font-mono">{result.year}</span>
           ) : null}
-          <span className={`text-[9px] border px-1.5 py-0.5 rounded font-bold tracking-wide ${sourceBadge.cls}`}>
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+                style={{ background: sourceBadge.bg, color: sourceBadge.color }}>
             {sourceBadge.label}
           </span>
-          {selected ? <span className="text-amber-400 text-xs font-bold">✓</span> : null}
+          {selected ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="#1A73E8">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+          ) : null}
         </div>
       </div>
-      <div className="flex items-center gap-3 mt-1">
-        {result.releaseName ? (
-          <span className="text-[10px] text-gray-600 truncate max-w-[180px]" title={result.releaseName}>
-            {result.releaseName}
-          </span>
-        ) : null}
-        {result.downloadCount > 0 ? (
-          <span className="text-[10px] text-gray-500 shrink-0">↓ {result.downloadCount.toLocaleString()}</span>
-        ) : null}
-      </div>
+      {result.releaseName ? (
+        <div className="flex items-center gap-2 mt-1">
+          <p className="text-[10px] text-[#9AA0A6] truncate">{result.releaseName}</p>
+          {result.downloadCount > 0 ? (
+            <span className="text-[10px] text-[#9AA0A6] shrink-0">↓ {result.downloadCount.toLocaleString()}</span>
+          ) : null}
+        </div>
+      ) : null}
     </button>
   );
 }
 
-function OffsetBtn({ label, onClick }: { label: string; onClick: () => void }) {
+function SyncBtn({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="px-2.5 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 active:bg-gray-600
-                 text-[11px] text-gray-400 hover:text-gray-200 transition-colors font-mono"
+      className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium font-mono text-[#3C4043] transition-colors md-ripple"
+      style={{ background: '#E8EAED' }}
     >
       {label}
     </button>
   );
 }
 
-function ContentTypeButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
+function MdSpinner({ white }: { white?: boolean }) {
   return (
-    <button
-      onClick={onClick}
-      className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
-        active
-          ? 'bg-amber-600 text-white shadow-sm'
-          : 'text-gray-500 hover:text-gray-300'
-      }`}
+    <svg
+      className="animate-spin"
+      width="16" height="16" viewBox="0 0 24 24" fill="none"
+      style={{ color: white ? 'white' : '#1A73E8' }}
     >
-      {label}
-    </button>
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
   );
 }

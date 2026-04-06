@@ -1,1 +1,93 @@
 @import "tailwindcss";
+
+/* Material Design 3 tokens for Chrome-native feel */
+:root {
+  --md-primary: #1A73E8;
+  --md-primary-hover: #1557B0;
+  --md-primary-container: #D2E3FC;
+  --md-on-primary: #FFFFFF;
+  --md-surface: #FFFFFF;
+  --md-surface-1: #F8F9FA;
+  --md-surface-2: #F1F3F4;
+  --md-surface-3: #E8EAED;
+  --md-on-surface: #202124;
+  --md-on-surface-2: #3C4043;
+  --md-on-surface-variant: #5F6368;
+  --md-outline: #DADCE0;
+  --md-outline-variant: #E8EAED;
+  --md-error: #D93025;
+  --md-success: #1E8E3E;
+  --md-warning: #E37400;
+  --md-ripple: rgba(26, 115, 232, 0.12);
+
+  font-family: 'Google Sans', 'Roboto', -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+}
+
+/* Material ripple effect */
+.md-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.md-ripple::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity 150ms;
+  border-radius: inherit;
+}
+
+.md-ripple:hover::after { opacity: 0.08; }
+.md-ripple:active::after { opacity: 0.12; }
+
+/* MD3 range slider */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--md-outline);
+  outline: none;
+  cursor: pointer;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--md-primary);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.24);
+  transition: transform 150ms, box-shadow 150ms;
+}
+
+input[type='range']::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 8px var(--md-ripple);
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--md-primary) var(--progress, 50%), var(--md-outline) var(--progress, 50%));
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--md-outline); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--md-on-surface-variant); }
