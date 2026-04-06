@@ -40,6 +40,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // Errors are intentionally suppressed: the popup may open before the
+    // background service worker is ready, or on a non-streaming tab where
+    // content scripts are absent. Silently failing leaves the UI in its
+    // empty default state, which is correct behavior.
     sendMessage<StatusResponse>({ type: 'GET_STATUS' }).then(setStatus).catch(() => {});
     sendMessage<TitleResponse>({ type: 'GET_TITLE' }).then((res) => {
       if (res?.title) {
@@ -246,9 +250,7 @@ export default function App() {
                 {loading ? <Spinner /> : 'Search'}
               </button>
             </div>
-            {detectedTitle && (
-              <DetectedTitleBadge title={detectedTitle} />
-            )}
+            {detectedTitle ? <DetectedTitleBadge title={detectedTitle} /> : null}
 
             {/* Season / Episode inputs (TV only) */}
             {contentType === 'tv' && (

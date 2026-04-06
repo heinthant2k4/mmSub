@@ -63,10 +63,7 @@ describe('detectTitle', () => {
 
     it('returns title from Disney+ DOM selector', () => {
       mockQuerySelector.mockImplementation((sel: string) => {
-        if (sel.includes('Disney')) {
-          return null;
-        }
-        if (sel.includes('title')) {
+        if (sel === '[data-testid="content-title"], .content-title, [class*="DetailTitle"], [class*="PlayerTitle"]') {
           return { textContent: 'The Mandalorian' };
         }
         return null;
@@ -101,6 +98,29 @@ describe('detectTitle', () => {
       mockQuerySelector.mockReturnValue(null);
       mockTitle.value = 'Watch The Boys - Amazon';
       expect(detectTitle()).toBe('The Boys');
+    });
+  });
+
+  // Prime Video via primevideo.com hostname
+  describe('Prime Video (primevideo.com)', () => {
+    beforeEach(() => {
+      (document as any).location = { hostname: 'www.primevideo.com' };
+    });
+
+    it('returns title from primevideo.com DOM selector', () => {
+      mockQuerySelector.mockImplementation((sel: string) => {
+        if (sel.includes('atvwebplayersdk')) {
+          return { textContent: 'Reacher' };
+        }
+        return null;
+      });
+      expect(detectTitle()).toBe('Reacher');
+    });
+
+    it('strips "- Amazon" suffix from document.title on primevideo.com', () => {
+      mockQuerySelector.mockReturnValue(null);
+      mockTitle.value = 'Watch Reacher - Amazon';
+      expect(detectTitle()).toBe('Reacher');
     });
   });
 

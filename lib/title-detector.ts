@@ -47,7 +47,7 @@ export function detectTitle(): string {
       title = stripStreamingSuffixes(document.title);
     }
   } else if (hostname.includes('disneyplus.com')) {
-    const el = document.querySelector('[class*="title"],[data-testid*="title"]');
+    const el = document.querySelector('[data-testid="content-title"], .content-title, [class*="DetailTitle"], [class*="PlayerTitle"]');
     title = el?.textContent?.trim() ?? '';
     if (!title) {
       title = stripStreamingSuffixes(document.title);

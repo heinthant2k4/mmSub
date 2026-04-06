@@ -60,7 +60,6 @@ export type StatusResponse = {
   loaded: boolean;
   cueCount: number;
   offsetMs: number;
-  detectedTitle?: string;
 };
 
 export type TitleResponse = { title: string };
