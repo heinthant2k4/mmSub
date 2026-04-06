@@ -2,11 +2,13 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 
 // We mock document methods before importing to control DOM behavior
 const mockQuerySelector = vi.fn();
+const mockQuerySelectorAll = vi.fn().mockReturnValue([]);
 const mockTitle = { value: '' };
 
 vi.stubGlobal('document', {
   get title() { return mockTitle.value; },
   querySelector: mockQuerySelector,
+  querySelectorAll: mockQuerySelectorAll,
   location: { hostname: 'www.netflix.com' },
 });
 
@@ -17,6 +19,8 @@ describe('detectTitle', () => {
   beforeEach(() => {
     mockQuerySelector.mockReset();
     mockQuerySelector.mockReturnValue(null);
+    mockQuerySelectorAll.mockReset();
+    mockQuerySelectorAll.mockReturnValue([]);
     mockTitle.value = '';
     // Reset hostname to a neutral value for most tests
     (document as any).location = { hostname: 'www.example.com' };
@@ -213,6 +217,87 @@ describe('detectTitle', () => {
       mockQuerySelector.mockReturnValue(null);
       mockTitle.value = '- Netflix';
       expect(detectTitle()).toBe('');
+    });
+  });
+
+  // OpenGraph og:title
+  describe('OpenGraph og:title', () => {
+    beforeEach(() => {
+      (document as any).location = { hostname: 'www.somesite.com' };
+    });
+
+    it('reads title from og:title meta tag', () => {
+      mockQuerySelector.mockImplementation((sel: string) => {
+        if (sel === 'meta[property="og:title"]') {
+          return { content: 'Oppenheimer' };
+        }
+        return null;
+      });
+      expect(detectTitle()).toBe('Oppenheimer');
+    });
+
+    it('cleans pirate noise from og:title', () => {
+      mockQuerySelector.mockImplementation((sel: string) => {
+        if (sel === 'meta[property="og:title"]') {
+          return { content: 'Watch Oppenheimer (2023) Full Movie Online Free' };
+        }
+        return null;
+      });
+      expect(detectTitle()).toBe('Oppenheimer');
+    });
+
+    it('skips empty og:title and falls back to document.title', () => {
+      mockQuerySelector.mockImplementation((sel: string) => {
+        if (sel === 'meta[property="og:title"]') {
+          return { content: '' };
+        }
+        return null;
+      });
+      mockTitle.value = 'Avatar | Hulu';
+      expect(detectTitle()).toBe('Avatar');
+    });
+  });
+
+  // Pirate site document.title noise stripping
+  describe('pirate site title cleaning', () => {
+    beforeEach(() => {
+      (document as any).location = { hostname: 'fmovies.to' };
+      mockQuerySelector.mockReturnValue(null);
+    });
+
+    it('strips "Watch " prefix and " Online Free" suffix', () => {
+      mockTitle.value = 'Watch Inception Online Free';
+      expect(detectTitle()).toBe('Inception');
+    });
+
+    it('strips "(2023)" year at end', () => {
+      mockTitle.value = 'Barbie (2023)';
+      expect(detectTitle()).toBe('Barbie');
+    });
+
+    it('strips "HD" quality tag', () => {
+      mockTitle.value = 'The Dark Knight HD';
+      expect(detectTitle()).toBe('The Dark Knight');
+    });
+
+    it('strips "1080p" resolution tag', () => {
+      mockTitle.value = 'Interstellar 1080p';
+      expect(detectTitle()).toBe('Interstellar');
+    });
+
+    it('strips "Full Movie Online" suffix', () => {
+      mockTitle.value = 'Parasite Full Movie Online';
+      expect(detectTitle()).toBe('Parasite');
+    });
+
+    it('strips "| SiteName" style suffix', () => {
+      mockTitle.value = 'Dune | FMovies';
+      expect(detectTitle()).toBe('Dune');
+    });
+
+    it('handles combined pirate noise', () => {
+      mockTitle.value = 'Watch Dune Part Two (2024) Online Free HD';
+      expect(detectTitle()).toBe('Dune Part Two');
     });
   });
 
