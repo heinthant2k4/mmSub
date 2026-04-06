@@ -4,6 +4,8 @@ export class SubtitleOverlay {
   private host: HTMLDivElement;
   private shadow: ShadowRoot;
   private subtitleEl: HTMLDivElement;
+  private toastEl: HTMLDivElement;
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
   private resizeObserver: ResizeObserver;
   private video: HTMLVideoElement | null = null;
   private fullscreenHandler: () => void;
@@ -22,6 +24,10 @@ export class SubtitleOverlay {
     this.subtitleEl = document.createElement('div');
     this.subtitleEl.className = 'subtitle-text';
     this.shadow.appendChild(this.subtitleEl);
+
+    this.toastEl = document.createElement('div');
+    this.toastEl.className = 'sync-toast';
+    this.shadow.appendChild(this.toastEl);
 
     this.resizeObserver = new ResizeObserver(() => this.reposition());
 
@@ -72,6 +78,25 @@ export class SubtitleOverlay {
 
       .subtitle-text:empty {
         display: none;
+      }
+
+      .sync-toast {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        font-family: monospace;
+        font-size: 13px;
+        color: #fbbf24;
+        background: rgba(0, 0, 0, 0.8);
+        padding: 4px 10px;
+        border-radius: 4px;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+      }
+
+      .sync-toast.visible {
+        opacity: 1;
       }
     `;
   }
@@ -140,7 +165,25 @@ export class SubtitleOverlay {
     this.reposition();
   }
 
+  showToast(message: string): void {
+    this.toastEl.textContent = message;
+    this.toastEl.classList.add('visible');
+
+    if (this.toastTimer !== null) {
+      clearTimeout(this.toastTimer);
+    }
+
+    this.toastTimer = setTimeout(() => {
+      this.toastEl.classList.remove('visible');
+      this.toastTimer = null;
+    }, 1500);
+  }
+
   destroy(): void {
+    if (this.toastTimer !== null) {
+      clearTimeout(this.toastTimer);
+      this.toastTimer = null;
+    }
     this.resizeObserver.disconnect();
     document.removeEventListener('fullscreenchange', this.fullscreenHandler);
     this.detach();
