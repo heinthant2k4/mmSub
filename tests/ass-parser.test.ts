@@ -153,4 +153,17 @@ Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,Hello, world, and more
     const cues = parseAss(ass);
     expect(cues[0].text).toBe('Hello, world, and more');
   });
+
+  it('parses timestamp without centiseconds (e.g. 0:00:01) to correct ms without NaN', () => {
+    const ass = `[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:01,0:00:03,Default,,0,0,0,,No centiseconds
+`;
+    const cues = parseAss(ass);
+    expect(cues).toHaveLength(1);
+    expect(cues[0].startMs).toBe(1000);
+    expect(cues[0].endMs).toBe(3000);
+    expect(isFinite(cues[0].startMs)).toBe(true);
+    expect(isFinite(cues[0].endMs)).toBe(true);
+  });
 });

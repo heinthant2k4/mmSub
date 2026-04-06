@@ -6,10 +6,12 @@ import type { SubtitleCue } from './messages';
  */
 function assTimeToMs(time: string): number {
   const [h, m, rest] = time.split(':');
-  const [s, cc] = rest.split('.');
+  const dotIdx = rest?.indexOf('.') ?? -1;
+  const s = dotIdx >= 0 ? rest.slice(0, dotIdx) : rest ?? '0';
+  const cc = dotIdx >= 0 ? rest.slice(dotIdx + 1) : '0';
   return (
-    parseInt(h, 10) * 3600000 +
-    parseInt(m, 10) * 60000 +
+    parseInt(h ?? '0', 10) * 3600000 +
+    parseInt(m ?? '0', 10) * 60000 +
     parseInt(s, 10) * 1000 +
     parseInt(cc, 10) * 10
   );
@@ -59,7 +61,8 @@ export function parseAss(text: string): SubtitleCue[] {
     if (!trimmed.startsWith('Dialogue:')) continue;
 
     // Split on comma with a max of 10 parts (9 commas = fields 1-9, remainder is Text)
-    // Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
+    // Standard ASS Format order: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
+    // Non-standard column orders (from custom Format: lines) are not supported.
     const afterPrefix = trimmed.slice('Dialogue:'.length).trimStart();
     // Remove the leading space after "Dialogue: " if present
     const parts = afterPrefix.split(',');
@@ -72,6 +75,9 @@ export function parseAss(text: string): SubtitleCue[] {
 
     const startMs = assTimeToMs(startStr);
     const endMs = assTimeToMs(endStr);
+
+    if (!isFinite(startMs) || !isFinite(endMs)) continue;
+    if (endMs < startMs) continue;
 
     // Process text: strip override tags, then replace soft line breaks
     const text = stripOverrideTags(textRaw)
