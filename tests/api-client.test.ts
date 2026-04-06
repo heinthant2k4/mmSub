@@ -50,8 +50,9 @@ describe('searchSubtitles', () => {
     const results = await searchSubtitles('The Dark Knight');
     expect(results).toHaveLength(1);
     expect(results[0]).toEqual({
+      source: 'os',
       fileId: 123,
-      title: 'The Dark Knight',
+      releaseName: '',
       language: 'my',
       downloadCount: 50,
       uploadDate: '2024-01-15',

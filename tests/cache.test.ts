@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SubtitleCache } from '../lib/cache';
 
-// Mock chrome.storage.local
+// Mock browser.storage.local
 const store: Record<string, any> = {};
 const mockStorage = {
   get: vi.fn((keys: string[]) => {
@@ -22,7 +22,7 @@ const mockStorage = {
   getBytesInUse: vi.fn(() => Promise.resolve(0)),
 };
 
-vi.stubGlobal('chrome', { storage: { local: mockStorage } });
+vi.stubGlobal('browser', { storage: { local: mockStorage } });
 
 describe('SubtitleCache', () => {
   let cache: SubtitleCache;
@@ -38,17 +38,23 @@ describe('SubtitleCache', () => {
     expect(result).toBeNull();
   });
 
-  it('stores and retrieves SRT text', async () => {
+  it('stores and retrieves SRT text by numeric key', async () => {
     await cache.set(123, 'srt content here');
     const result = await cache.get(123);
     expect(result).toBe('srt content here');
   });
 
+  it('stores and retrieves SRT text by string key', async () => {
+    await cache.set('/subtitle/123-456.zip', 'srt content here');
+    const result = await cache.get('/subtitle/123-456.zip');
+    expect(result).toBe('srt content here');
+  });
+
   it('uses prefixed keys to avoid collisions', async () => {
     await cache.set(123, 'test');
-    expect(mockStorage.set).toHaveBeenCalledWith({
-      'srt_123': 'test',
-    });
+    expect(mockStorage.set).toHaveBeenCalledWith(
+      expect.objectContaining({ 'srt_123': 'test' }),
+    );
   });
 
   it('removes a cached entry', async () => {
