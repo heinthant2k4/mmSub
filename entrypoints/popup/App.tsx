@@ -29,6 +29,7 @@ export default function App() {
   const [dragOver, setDragOver] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState('');
   const [detectedTitle, setDetectedTitle] = useState('');
+  const [recentSubtitles, setRecentSubtitles] = useState<SubtitleResult[]>([]);
   const [fontSize, setFontSize] = useState(24);
   const [bottomPct, setBottomPct] = useState(8);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -54,12 +55,14 @@ export default function App() {
         setQuery(res.title);
       }
     }).catch(() => {});
-    browser.storage.sync.get('subtitleSettings').then((data: Record<string, unknown>) => {
+    browser.storage.sync.get(['subtitleSettings', 'recentSubtitles']).then((data: Record<string, unknown>) => {
       const saved = data['subtitleSettings'] as { fontSize?: number; bottomPct?: number } | undefined;
       if (saved) {
         setFontSize(saved.fontSize ?? 24);
         setBottomPct(saved.bottomPct ?? 8);
       }
+      const recents = data['recentSubtitles'] as SubtitleResult[] | undefined;
+      if (Array.isArray(recents)) setRecentSubtitles(recents);
     }).catch(() => {});
   }, []);
 
@@ -102,6 +105,7 @@ export default function App() {
       const resp = await sendMessage<SelectResponse>(msg);
       if (resp.ok) {
         setStatus(s => ({ ...s, loaded: true, cueCount: resp.cueCount, offsetMs: 0 }));
+        saveToRecents(result);
       } else {
         setError(resp.error);
         setSelectedKey(null);
@@ -112,7 +116,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [saveToRecents]);
 
   const processFile = useCallback(async (file: File) => {
     const lowerName = file.name.toLowerCase();
@@ -160,6 +164,19 @@ export default function App() {
       await sendMessage({ type: 'OFFSET', deltaMs });
       setStatus(s => ({ ...s, offsetMs: s.offsetMs + deltaMs }));
     } catch {}
+  }, []);
+
+  const saveToRecents = useCallback((result: SubtitleResult) => {
+    setRecentSubtitles(prev => {
+      const key = result.source === 'os' ? `os:${result.fileId}` : `subdl:${result.sdUrl}`;
+      const filtered = prev.filter(r => {
+        const rKey = r.source === 'os' ? `os:${r.fileId}` : `subdl:${r.sdUrl}`;
+        return rKey !== key;
+      });
+      const next = [result, ...filtered].slice(0, 5);
+      browser.storage.sync.set({ recentSubtitles: next }).catch(() => {});
+      return next;
+    });
   }, []);
 
   const applyAndSaveSettings = useCallback((nextFontSize: number, nextBottomPct: number) => {
@@ -319,6 +336,26 @@ export default function App() {
             )}
 
             {error ? <ErrorBanner message={error} onDismiss={() => setError('')} /> : null}
+
+            {recentSubtitles.length > 0 && results.length === 0 && (
+              <div className="mb-3">
+                <p className="text-[10px] text-gray-600 uppercase tracking-wider mb-2">Recent</p>
+                <div className="space-y-1.5">
+                  {recentSubtitles.map(r => {
+                    const key = r.source === 'os' ? `os:${r.fileId}` : `subdl:${r.sdUrl}`;
+                    return (
+                      <ResultCard
+                        key={key}
+                        result={r}
+                        selected={selectedKey === key}
+                        loading={loading}
+                        onSelect={() => handleSelect(r)}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {results.length > 0 && (
               <div>
