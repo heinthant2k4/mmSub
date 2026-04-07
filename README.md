@@ -205,7 +205,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ```bash
 # Run tests
-pnpm testt
+pnpm test
 
 # Type check
 pnpm typecheck
